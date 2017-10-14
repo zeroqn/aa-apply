@@ -70,6 +70,20 @@ contract Payroll is Ownable, Pausable {
         return payroll.calculatePayrollRunway();
     }
 
+    function setDBAddress(address _db)
+        onlyOwner
+        external
+    {
+        payroll.setDBAddress(_db);
+    }
+
+    function setTokenAddresses(address ant, address usd)
+        onlyOwner
+        external
+    {
+        payroll.setTokenAddresses(ant, usd);
+    }
+
     function addEmployee(
         address   accountAddress,
         address[] allowedTokens,
