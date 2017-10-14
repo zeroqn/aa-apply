@@ -46,7 +46,13 @@ contract Payroll is Ownable, Pausable {
     function getEmployeeCount()
         external constant returns (uint256)
     {
-        payroll.db.getEmployeeCount();
+        return payroll.db.getEmployeeCount();
+    }
+
+    function getEmployeeId(address account)
+        external constant returns (uint256)
+    {
+        return payroll.db.getEmployeeId(account);
     }
 
     function getEmployee(uint256 employeeId)
