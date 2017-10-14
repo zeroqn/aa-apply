@@ -20,13 +20,15 @@ contract PayrollInterface {
     function removeEmployee(uint256 employeeId);
 
     function addFunds() payable;
-    function scapeHatch();
+    function escapeHatch();
     // TODO: Use approveAndCall or ERC223 tokenFallback
     // function addTokenFunds()
 
     function getEmployeeCount() constant returns (uint256);
-    // TODO: return all important info too
-    function getEmployee(uint256 employeeId) constant returns(address employee);
+    function getEmployee(uint256 employeeId)
+        constant returns (bool    active,
+                          address employee,
+                          uint256 yearlyUSDSalary);
 
     // @dev Monthly USD amount spent in salaries
     function calculatePayrollBurnrate() constant returns (uint256);
