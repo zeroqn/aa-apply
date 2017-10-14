@@ -47,11 +47,9 @@ library PayrollLibrary {
         return self.db.getUSDMonthlySalaries();
     }
 
-    /// @notice We assume the pay day is same for all employees
-    function calculatePayrollRunway(Payroll storage self)
+    function calculatePayrollRunwayInMonths(Payroll storage self)
         internal constant returns (uint256)
     {
-        uint256 ONE_MONTH = 4 weeks;
         uint256 unpaidUSDSalaries = self.unpaidUSDSalaries[self.payRound];
         uint256 usdFunds = USDToken(self.usdToken).balanceOf(this);
 
@@ -69,9 +67,25 @@ library PayrollLibrary {
         usdFunds = usdFunds.sub(unpaidUSDSalaries);
         uint256 usdMonthlySalaries = self.db.getUSDMonthlySalaries();
         // usdFunds / sudMonthlySalaries
-        uint256 leftMonths = usdFunds.div(usdMonthlySalaries);
+        return usdFunds.div(usdMonthlySalaries);
+    }
 
-        return self.nextPayDay.sub(ONE_MONTH).add(leftMonths * ONE_MONTH);
+    /// @notice We assume the pay day is same for all employees
+    function calculatePayrollRunway(Payroll storage self)
+        internal constant returns (uint256)
+    {
+        uint256 ONE_MONTH = 4 weeks;
+        uint256 date = self.nextPayDay;
+        uint256 leftMonths = calculatePayrollRunwayInMonths(self);
+
+        if (date == 0) {
+            // nothing paid yet
+            date = now;
+        } else {
+            // calculate from previous payday
+            date = date.sub(ONE_MONTH);
+        }
+        return date.add(leftMonths.mul(ONE_MONTH));
     }
 
     function setDBAddress(Payroll storage self, address _db)

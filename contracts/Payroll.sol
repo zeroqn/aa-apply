@@ -76,6 +76,12 @@ contract Payroll is Ownable, Pausable {
         return payroll.calculatePayrollRunway();
     }
 
+    function calculatePayrollRunwayInMonths()
+        external constant returns (uint256)
+    {
+        return payroll.calculatePayrollRunwayInMonths();
+    }
+
     function setDBAddress(address _db)
         onlyOwner
         external
