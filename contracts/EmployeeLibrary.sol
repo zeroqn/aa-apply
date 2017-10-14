@@ -252,7 +252,7 @@ library EmployeeLibrary {
     function nextId(address db)
         private returns (uint256)
     {
-        return PayrollDB(db).addUIntValue(keyHash("/idCount"), 1);
+        return PayrollDB(db).addUIntValue(keyHash("/count"), 1);
     }
 
     function setAllowedTokens(
