@@ -139,6 +139,7 @@ contract Payroll is Ownable, Pausable {
     }
 
     function emergencyWithdraw()
+        onlyOwner
         whenPaused
         external
     {
