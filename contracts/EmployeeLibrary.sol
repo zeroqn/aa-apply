@@ -50,7 +50,6 @@ library EmployeeLibrary {
         return true;
     }
 
-    /// TODO: should return active employee count
     /// @dev Get active employee count
     /// @param db address Deployed PayrollDB address
     /// @return uint256 active employee count
@@ -176,6 +175,7 @@ library EmployeeLibrary {
 
 
         uint256 id = nextId(db);
+        db.addUIntValue(keyHash("/count"), 1);
         db.setBooleanValue(keyHash("/active", id), true);
         db.setAddressValue(keyHash("/account", id), account);
         setAllowedTokens(db, id, allowedTokens);
@@ -207,14 +207,16 @@ library EmployeeLibrary {
     }
 
     /// @dev Remove employee
-    /// @param db address Deployed PayrollDB address
+    /// @param _db address Deployed PayrollDB address
     /// @param employeeId uint256 given id to remove
-    function removeEmployee(address db, uint256 employeeId)
+    function removeEmployee(address _db, uint256 employeeId)
         internal
     {
         require(employeeId > 0);
+        PayrollDB db = PayrollDB(_db);
 
-        PayrollDB(db).setBooleanValue(keyHash("/active", employeeId), false);
+        db.setBooleanValue(keyHash("/active", employeeId), false);
+        db.subUIntValue(keyHash("/count"), 1);
         OnEmployeeRemoved(employeeId);
     }
 
@@ -298,7 +300,7 @@ library EmployeeLibrary {
     function nextId(address db)
         private returns (uint256)
     {
-        return PayrollDB(db).addUIntValue(keyHash("/count"), 1);
+        return PayrollDB(db).addUIntValue(keyHash("/idCount"), 1);
     }
 
     function setAllowedTokens(

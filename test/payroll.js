@@ -120,8 +120,18 @@ contract('Payroll', (accounts) => {
     });
 
   it('should return employee count', async () => {
-    let count = await payroll.getEmployeeCount();
+    let count;
 
+    count = await payroll.getEmployeeCount();
+    assert.equal(count.toNumber(), 1);
+
+    await payroll.addEmployee(accounts[1], allowedTokens,
+      testYearlyUSDSalary, {from: owner});
+    count = await payroll.getEmployeeCount();
+    assert.equal(count.toNumber(), 2);
+
+    await payroll.removeEmployee(testEmployeeId, {from: owner});
+    count = await payroll.getEmployeeCount();
     assert.equal(count.toNumber(), 1);
   });
 
