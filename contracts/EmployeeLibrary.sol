@@ -23,8 +23,11 @@ library EmployeeLibrary {
         uint256 indexed employeeId,
         uint256 indexed yearlyUSDSalary
     );
-    event OnEmployeeRemoved(
-        uint256 indexed employeeId
+    event OnEmployeeRemoved(uint256 indexed employeeId);
+    event OnAllocationChanged(
+        uint256 indexed employeeId,
+        address token,
+        uint256 alloc
     );
 
     function isEmployee(address _db)
@@ -298,6 +301,7 @@ library EmployeeLibrary {
                 keyHash("/tokens/alloc", employeeId, nonce, tokens[i]),
                 distribution[i]
             );
+            OnAllocationChanged(employeeId, tokens[i], distribution[i]);
         }
     }
 

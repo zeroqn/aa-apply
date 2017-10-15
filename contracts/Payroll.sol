@@ -35,6 +35,11 @@ contract Payroll is Ownable, Pausable {
     );
     event OnEmployeeRemoved(uint256 indexed employeeId);
     event OnEthFundsAdded(address account, uint256 indexed ethfunds);
+    event OnAllocationChanged(
+        uint256 indexed employeeId,
+        address token,
+        uint256 alloc
+    );
     event OnPaid(uint256 indexed employeeId, uint256 indexed USDSalary);
 
     function Payroll(address _db, address antToken, address usdToken) {
