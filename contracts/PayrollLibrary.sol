@@ -111,9 +111,10 @@ library PayrollLibrary {
     {
         uint ONE_MONTH = 4 weeks;
         uint payRound = self.payRound;
+        uint nextPayDay = self.nextPayDay;
         uint unpaidUSDSalaries = self.unpaidUSDSalaries[payRound];
 
-        if (now > self.nextPayDay) {
+        if (now > nextPayDay) {
             // start next pay round
             uint256 usdMonthlySalaries = self.db.getUSDMonthlySalaries();
             payRound = payRound.add(1);
@@ -121,7 +122,11 @@ library PayrollLibrary {
                 unpaidUSDSalaries.add(usdMonthlySalaries);
 
             self.payRound = payRound;
-            self.nextPayDay = self.nextPayDay.add(ONE_MONTH);
+            if (nextPayDay == 0) {
+                // this is first payment
+                nextPayDay = now;
+            }
+            self.nextPayDay = nextPayDay.add(ONE_MONTH);
         }
 
         if (self.payStats[payRound][msg.sender]) {
