@@ -9,7 +9,6 @@ import "./PayrollDB.sol";
 
 import "zeppelin-solidity/contracts/math/SafeMath.sol";
 
-// TODO: getAllowedTokens()
 library EmployeeLibrary {
 
     using SafeMath for uint256;
@@ -30,6 +29,9 @@ library EmployeeLibrary {
         uint256 alloc
     );
 
+    /// @dev Check if msg.sender is active employee
+    /// @param _db address Deployed PayrollDB address
+    /// @return bool true if msg.sender is active employee
     function isEmployee(address _db)
         internal constant returns (bool)
     {
@@ -48,18 +50,33 @@ library EmployeeLibrary {
         return true;
     }
 
+    /// TODO: should return active employee count
+    /// @dev Get active employee count
+    /// @param db address Deployed PayrollDB address
+    /// @return uint256 active employee count
     function getEmployeeCount(address db)
         internal constant returns (uint256)
     {
         return PayrollDB(db).getUIntValue(keyHash("/count"));
     }
 
+    /// @dev Get employeeId for given address
+    /// @param db address Deployed PayrollDB address
+    /// @param account address given address to query
+    /// @return uint256 employeeId
     function getEmployeeId(address db, address account)
         internal constant returns (uint256)
     {
         return PayrollDB(db).getUIntValue(keyHash("/id", account));
     }
 
+    /// @dev Get employee info for given id
+    /// @param _db address Deployed PayrollDB address
+    /// @param employeeId uint256 given employeeId to query
+    /// @return bool if employee is active
+    /// @return address given employee account
+    /// @return uint256 monthly USD salary
+    /// @return uint256 yearly USD salary
     function getEmployee(address _db, uint256 employeeId)
         internal constant returns (bool    active,
                                    address account,
@@ -80,12 +97,19 @@ library EmployeeLibrary {
         return (active, account, monthlyUSDSalary, yearlyUSDSalary);
     }
 
+    /// @dev Get total monthly USD salaries for all active employees
+    /// @param db address Deployed PayrollDB address
+    /// @return uint256 total monthly USD salaries
     function getUSDMonthlySalaries(address db)
         internal constant returns (uint256)
     {
         return PayrollDB(db).getUIntValue(keyHash("/USDMonthlySalaries"));
     }
 
+    /// @dev Get all allowed tokens for givem employeId
+    /// @param _db address Deployed PayrollDB address
+    /// @param employeeId uint256 given id to query
+    /// @return address[] allowed tokens
     function getEmployeeTokens(address _db, uint256 employeeId)
         internal constant returns (address[] tokens)
     {
@@ -103,6 +127,10 @@ library EmployeeLibrary {
         return tokens;
     }
 
+    /// @dev Get tokens allocation for given employeeId
+    /// @param _db address Deployed PayrollDB address
+    /// @param employeeId uint256 given id to query
+    /// @return uint256[] tokens allocation
     function getEmployeeTokensAlloc(
         address _db,
         uint256 employeeId
@@ -125,6 +153,11 @@ library EmployeeLibrary {
         return allocation;
     }
 
+    /// @dev Add new employee
+    /// @param _db address Deployed PayrollDB address
+    /// @param account address employee address
+    /// @param allowedTokens address[] allowed tokens for salary payment
+    /// @param initialYearlyUSDSalary uint256 salary in USD for year
     function addEmployee(
         address   _db,
         address   account,
@@ -152,6 +185,10 @@ library EmployeeLibrary {
         OnEmployeeAdded(id, account, initialYearlyUSDSalary);
     }
 
+    /// @dev Set employee yearly salary
+    /// @param db address Deployed PayrollDB address
+    /// @param employeeId uint256 give id to query
+    /// @param yearlyUSDSalary uint256 salary in USD for year
     function setEmployeeSalary(
         address db,
         uint256 employeeId,
@@ -169,6 +206,9 @@ library EmployeeLibrary {
         OnEmployeeSalaryUpdated(employeeId, yearlyUSDSalary);
     }
 
+    /// @dev Remove employee
+    /// @param db address Deployed PayrollDB address
+    /// @param employeeId uint256 given id to remove
     function removeEmployee(address db, uint256 employeeId)
         internal
     {
@@ -178,7 +218,10 @@ library EmployeeLibrary {
         OnEmployeeRemoved(employeeId);
     }
 
-    /// @dev Set employee
+    /// @dev Set employee allowed tokens allocation
+    /// @param _db address Deployed PayrollDB address
+    /// @param tokens address[] allowed tokens
+    /// @param distribution uint256[] tokens allocation
     function setEmployeeTokenAllocation(
         address   _db,
         address[] tokens,

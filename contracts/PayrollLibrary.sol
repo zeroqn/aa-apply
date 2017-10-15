@@ -41,12 +41,19 @@ library PayrollLibrary {
 
     event OnPaid(uint256 indexed employeeId, uint256 indexed USDSalary);
 
+    /// @dev Calculate Monthly USD amount spent in salaries
+    /// @param self Payroll Payroll data struct
+    /// @return uint256 monthly USD salaries
     function calculatePayrollBurnrate(Payroll storage self)
         internal constant returns (uint256)
     {
         return self.db.getUSDMonthlySalaries();
     }
 
+    /// @dev Calculate months until the contract run out of funds
+    /// @notice We assume the pay day is same for all employees
+    /// @param self Payroll Payroll data struct
+    /// @return uint256 left months
     function calculatePayrollRunwayInMonths(Payroll storage self)
         internal constant returns (uint256)
     {
@@ -70,7 +77,10 @@ library PayrollLibrary {
         return usdFunds.div(usdMonthlySalaries);
     }
 
+    /// @dev Calculate days until the contract run out of funds
     /// @notice We assume the pay day is same for all employees
+    /// @param self Payroll Payroll data struct
+    /// @return uint256 left days
     function calculatePayrollRunway(Payroll storage self)
         internal constant returns (uint256)
     {
@@ -88,6 +98,9 @@ library PayrollLibrary {
         return date.add(leftMonths.mul(ONE_MONTH));
     }
 
+    /// @dev Set PayrollDB address
+    /// @param self Payroll Payroll data struct
+    /// @param _db address Deployed PayrollDB address
     function setDBAddress(Payroll storage self, address _db)
         internal
     {
@@ -96,6 +109,10 @@ library PayrollLibrary {
         self.db = _db;
     }
 
+    /// @dev Set ANT token and USD token addresses
+    /// @param self Payroll Payroll data struct
+    /// @param ant address Deployed ANT token address
+    /// @param usd address Deployed USD token address
     function setTokenAddresses(Payroll storage self, address ant, address usd)
         internal
     {
@@ -105,7 +122,10 @@ library PayrollLibrary {
         self.usdToken = usd;
     }
 
-    /// @notice We assume all employees take their salaries every month
+    /// @dev Pay salary to employee
+    /// @notice We assume all employees take their salaries every months. Also
+    /// employee can only call this function once per month.
+    /// @param self Payroll Payroll data struct
     function payday(Payroll storage self)
         internal
     {
@@ -137,6 +157,8 @@ library PayrollLibrary {
         pay(self, self.db.getEmployeeId(msg.sender));
     }
 
+    /// @dev Use oraclize oracle to fetch latest token exchange rates
+    /// @param self Payroll Payroll data struct
     function updateExchangeRates(Payroll storage self)
         internal
     {
@@ -151,6 +173,11 @@ library PayrollLibrary {
         self.isOracleId[ethId] = 2;
     }
 
+    /// @dev Callback function used by oraclize to actually set token exchange
+    /// rate.
+    /// @param self Payroll Payroll data struct
+    /// @param id bytes32 oraclize generated id per querying
+    /// @param result string oraclize querying result, toke exchange rate
     function setExchangeRateByOraclize(
         Payroll storage self,
         bytes32 id,
@@ -169,6 +196,10 @@ library PayrollLibrary {
         }
     }
 
+    /// @dev Set token exchange rate
+    /// @param self Payroll Payroll data struct
+    /// @param token address target token
+    /// @param usdExchangeRate uint256 exchange rate
     function setExchangeRate(
         Payroll storage self,
         address token,
@@ -181,6 +212,9 @@ library PayrollLibrary {
         self.exchangeRates[token] = usdExchangeRate;
     }
 
+    /// @dev Pay to employee
+    /// @param self Payroll Payroll data struct
+    /// @param employeeId uint256 specified employee to pay
     function pay(Payroll storage self, uint256 employeeId)
         private
     {
