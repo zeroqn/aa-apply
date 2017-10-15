@@ -141,13 +141,13 @@ library EmployeeLibrary {
 
         PayrollDB db = PayrollDB(_db);
 
-        updateUSDMonthlySalaries(db, 0, initialYearlyUSDSalary);
 
         uint256 id = nextId(db);
         db.setBooleanValue(keyHash("/active", id), true);
         db.setAddressValue(keyHash("/account", id), account);
         setAllowedTokens(db, id, allowedTokens);
         db.setUIntValue(keyHash("/yearlyUSDSalary", id),initialYearlyUSDSalary);
+        updateUSDMonthlySalaries(db, id, initialYearlyUSDSalary);
         db.setUIntValue(keyHash("/id", account), id);
         OnEmployeeAdded(id, account, initialYearlyUSDSalary);
     }
@@ -321,12 +321,12 @@ library EmployeeLibrary {
         );
         uint256 monthlyUSDSalary = yearlyUSDSalary.div(12);
 
-        if (employeeId != 0) {
-            // for exist employee, subtract previous monthly salary
-            // then add updated one.
-            uint256 preMonthlySalary = db.getUIntValue(
-                keyHash("/monthlyUSDSalary", employeeId)
-            );
+        // for exist employee, subtract previous monthly salary
+        // then add updated one.
+        uint256 preMonthlySalary = db.getUIntValue(
+            keyHash("/monthlyUSDSalary", employeeId)
+        );
+        if (preMonthlySalary != 0) {
             usdMonthlySalaries = usdMonthlySalaries.sub(preMonthlySalary);
         }
 
