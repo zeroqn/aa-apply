@@ -1,4 +1,4 @@
-pragma solidity ^0.4.15;
+pragma solidity ^0.4.17;
 
 /**
  * @title EmployeeLibrary
@@ -33,7 +33,7 @@ library EmployeeLibrary {
     /// @param _db address Deployed PayrollDB address
     /// @return bool true if msg.sender is active employee
     function isEmployee(address _db)
-        internal constant returns (bool)
+        internal view returns (bool)
     {
         PayrollDB db = PayrollDB(_db);
 
@@ -54,7 +54,7 @@ library EmployeeLibrary {
     /// @param db address Deployed PayrollDB address
     /// @return uint256 active employee count
     function getEmployeeCount(address db)
-        internal constant returns (uint256)
+        internal view returns (uint256)
     {
         return PayrollDB(db).getUIntValue(keyHash("/count"));
     }
@@ -64,7 +64,7 @@ library EmployeeLibrary {
     /// @param account address given address to query
     /// @return uint256 employeeId
     function getEmployeeId(address db, address account)
-        internal constant returns (uint256)
+        internal view returns (uint256)
     {
         return PayrollDB(db).getUIntValue(keyHash("/id", account));
     }
@@ -77,7 +77,7 @@ library EmployeeLibrary {
     /// @return uint256 monthly USD salary
     /// @return uint256 yearly USD salary
     function getEmployee(address _db, uint256 employeeId)
-        internal constant returns (bool    active,
+        internal view returns (bool    active,
                                    address account,
                                    uint256 monthlyUSDSalary,
                                    uint256 yearlyUSDSalary)
@@ -100,7 +100,7 @@ library EmployeeLibrary {
     /// @param db address Deployed PayrollDB address
     /// @return uint256 total monthly USD salaries
     function getUSDMonthlySalaries(address db)
-        internal constant returns (uint256)
+        internal view returns (uint256)
     {
         return PayrollDB(db).getUIntValue(keyHash("/USDMonthlySalaries"));
     }
@@ -110,7 +110,7 @@ library EmployeeLibrary {
     /// @param employeeId uint256 given id to query
     /// @return address[] allowed tokens
     function getEmployeeTokens(address _db, uint256 employeeId)
-        internal constant returns (address[] tokens)
+        internal view returns (address[] tokens)
     {
         PayrollDB db = PayrollDB(_db);
         uint256 count = db.getUIntValue(keyHash("/tokens/count", employeeId));
@@ -134,7 +134,7 @@ library EmployeeLibrary {
         address _db,
         uint256 employeeId
     )
-        internal constant returns (uint256[] allocation)
+        internal view returns (uint256[] allocation)
     {
         PayrollDB db = PayrollDB(_db);
         uint256 nonce = db.getUIntValue(
@@ -268,31 +268,31 @@ library EmployeeLibrary {
     }
 
     function keyHash(string property)
-        private constant returns (bytes32)
+        private pure returns (bytes32)
     {
         return keccak256("/Employee", property);
     }
 
     function keyHash(string property, uint id)
-        private constant returns (bytes32)
+        private pure returns (bytes32)
     {
         return keccak256("/Employee", id, property);
     }
 
     function keyHash(string property, address account)
-        private constant returns (bytes32)
+        private pure returns (bytes32)
     {
         return keccak256("/Employee", account, property);
     }
 
     function keyHash(string property, uint256 id, uint256 nonce, uint idx)
-        private constant returns (bytes32)
+        private pure returns (bytes32)
     {
         return keccak256("/Employee", id, property, nonce, idx);
     }
 
     function keyHash(string property, uint256 id, uint256 nonce, address addr)
-        private constant returns (bytes32)
+        private pure returns (bytes32)
     {
         return keccak256("/Employee", id, property, nonce, addr);
     }

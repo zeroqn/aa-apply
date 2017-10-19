@@ -1,4 +1,4 @@
-pragma solidity ^0.4.15;
+pragma solidity ^0.4.17;
 
 /**
  * @title PayrollLibrary
@@ -45,7 +45,7 @@ library PayrollLibrary {
     /// @param self Payroll Payroll data struct
     /// @return uint256 monthly USD salaries
     function calculatePayrollBurnrate(Payroll storage self)
-        internal constant returns (uint256)
+        internal view returns (uint256)
     {
         return self.db.getUSDMonthlySalaries();
     }
@@ -55,7 +55,7 @@ library PayrollLibrary {
     /// @param self Payroll Payroll data struct
     /// @return uint256 left months
     function calculatePayrollRunwayInMonths(Payroll storage self)
-        internal constant returns (uint256)
+        internal view returns (uint256)
     {
         uint256 unpaidUSDSalaries = self.unpaidUSDSalaries[self.payRound];
         uint256 usdFunds = USDToken(self.usdToken).balanceOf(this);
@@ -82,7 +82,7 @@ library PayrollLibrary {
     /// @param self Payroll Payroll data struct
     /// @return uint256 left days
     function calculatePayrollRunway(Payroll storage self)
-        internal constant returns (uint256)
+        internal view returns (uint256)
     {
         uint256 ONE_MONTH = 4 weeks;
         uint256 date = self.nextPayDay;

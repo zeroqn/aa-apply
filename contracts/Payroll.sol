@@ -1,4 +1,4 @@
-pragma solidity ^0.4.15;
+pragma solidity ^0.4.17;
 
 /**
  * @title Payroll
@@ -49,19 +49,19 @@ contract Payroll is Ownable, Pausable {
     }
 
     function getEmployeeCount()
-        external constant returns (uint256)
+        external view returns (uint256)
     {
         return payroll.db.getEmployeeCount();
     }
 
     function getEmployeeId(address account)
-        external constant returns (uint256)
+        external view returns (uint256)
     {
         return payroll.db.getEmployeeId(account);
     }
 
     function getEmployee(uint256 employeeId)
-        external constant returns (bool active,
+        external view returns (bool active,
                                    address employee,
                                    uint256 yearlyUSDSalary)
     {
@@ -70,19 +70,19 @@ contract Payroll is Ownable, Pausable {
     }
 
     function calculatePayrollBurnrate()
-        external constant returns (uint256)
+        external view returns (uint256)
     {
         return payroll.calculatePayrollBurnrate();
     }
 
     function calculatePayrollRunway()
-        external constant returns (uint256)
+        external view returns (uint256)
     {
         return payroll.calculatePayrollRunway();
     }
 
     function calculatePayrollRunwayInMonths()
-        external constant returns (uint256)
+        external view returns (uint256)
     {
         return payroll.calculatePayrollRunwayInMonths();
     }

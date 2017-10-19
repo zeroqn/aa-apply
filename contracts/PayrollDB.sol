@@ -1,4 +1,4 @@
-pragma solidity ^0.4.15;
+pragma solidity ^0.4.17;
 
 /**
  * @title PayrollDB
@@ -27,7 +27,7 @@ contract PayrollDB is Ownable {
     }
 
     function getAllowedContractsCount()
-        external constant returns (uint256)
+        external view returns (uint256)
     {
         return allowedContracts.length;
     }
@@ -59,7 +59,7 @@ contract PayrollDB is Ownable {
     }
 
     function validContracts(address[] _contracts)
-        private constant returns (bool)
+        private pure returns (bool)
     {
         for (uint i = 0; i < _contracts.length; i++) {
             if (_contracts[i] == 0x0) {
@@ -75,7 +75,7 @@ contract PayrollDB is Ownable {
     // ================
 
     function getUIntValue(bytes32 key)
-        external constant returns (uint)
+        external view returns (uint)
     {
         return UIntStorage[key];
     }
@@ -131,7 +131,7 @@ contract PayrollDB is Ownable {
     // ================
 
     function getAddressValue(bytes32 key)
-        external constant returns (address)
+        external view returns (address)
     {
         return AddressStorage[key];
     }
@@ -155,7 +155,7 @@ contract PayrollDB is Ownable {
     // ================
 
     function getBooleanValue(bytes32 record)
-        external constant returns (bool)
+        external view returns (bool)
     {
         return BooleanStorage[record];
     }
