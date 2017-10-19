@@ -42,7 +42,9 @@ contract Payroll is Ownable, Pausable {
     );
     event OnPaid(uint256 indexed employeeId, uint256 indexed USDSalary);
 
-    function Payroll(address _db, address antToken, address usdToken) {
+    function Payroll(address _db, address antToken, address usdToken)
+        public
+    {
         // constructor
         payroll.setDBAddress(_db);
         payroll.setTokenAddresses(antToken, usdToken);

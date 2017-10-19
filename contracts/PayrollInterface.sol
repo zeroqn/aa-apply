@@ -15,34 +15,40 @@ contract PayrollInterface {
         address   accountAddress,
         address[] allowedTokens,
         uint256   initialYearlyUSDSalary
-    );
-    function setEmployeeSalary(uint256 employeeId, uint256 yearlyUSDSalary);
-    function removeEmployee(uint256 employeeId);
+    ) external;
+    function setEmployeeSalary(
+        uint256 employeeId,
+        uint256 yearlyUSDSalary
+    ) external;
+    function removeEmployee(uint256 employeeId) external;
 
-    function addFunds() payable;
-    function escapeHatch();
+    function addFunds() payable external;
+    function escapeHatch() external;
     // TODO: Use approveAndCall or ERC223 tokenFallback
     // function addTokenFunds()
 
-    function getEmployeeCount() constant returns (uint256);
+    function getEmployeeCount() external constant returns (uint256);
     function getEmployee(uint256 employeeId)
-        constant returns (bool    active,
-                          address employee,
-                          uint256 yearlyUSDSalary);
+        external constant returns (bool    active,
+                                   address employee,
+                                   uint256 yearlyUSDSalary);
 
     // @dev Monthly USD amount spent in salaries
-    function calculatePayrollBurnrate() constant returns (uint256);
+    function calculatePayrollBurnrate() external constant returns (uint256);
     // @dev Days until the contract can run out of funds
-    function calculatePayrollRunway() constant returns (uint256);
+    function calculatePayrollRunway() external constant returns (uint256);
 
     /* EMPLOYEE ONLY */
     // @notice Only callable once every 6 months
-    function determineAllocation(address[] tokens, uint256[] distribution);
+    function determineAllocation(
+        address[] tokens,
+        uint256[] distribution
+    ) external;
     // @notice Only callable once a month
-    function payday();
+    function payday() external;
 
     /* ORACLE ONLY */
     // @dev Uses decimals from token
-    function setExchangeRate(address token, uint256 usdExchangeRate);
+    function setExchangeRate(address token, uint256 usdExchangeRate) external;
 
 }
