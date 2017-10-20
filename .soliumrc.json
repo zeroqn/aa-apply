@@ -12,6 +12,7 @@
     "arg-overflow": [
       "warning",
       3
-    ]
+    ],
+    "mixedcase": 0
   }
 }

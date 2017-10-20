@@ -242,7 +242,7 @@ library EmployeeLibrary {
     )
         internal
     {
-        uint256 sixMonths = 4 weeks * 6;
+        uint256 SIX_MONTHS = 4 weeks * 6;
 
         PayrollDB db = PayrollDB(_db);
         uint256 distSum = 0;
@@ -277,7 +277,7 @@ library EmployeeLibrary {
             // first time
             nextAllocTime = now;
         }
-        nextAllocTime = nextAllocTime.add(sixMonths);
+        nextAllocTime = nextAllocTime.add(SIX_MONTHS);
         db.setUIntValue(
             keyHash("/tokens/nextAllocTime", employeeId), nextAllocTime
         );
