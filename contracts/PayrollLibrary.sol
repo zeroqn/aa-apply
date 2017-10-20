@@ -12,6 +12,7 @@ import "./mocks/ANTToken.sol";
 import "./oraclizeAPI.lib.sol";
 import "zeppelin-solidity/contracts/math/SafeMath.sol";
 
+
 library PayrollLibrary {
 
     using SafeMath for uint256;
@@ -138,8 +139,9 @@ library PayrollLibrary {
             // start next pay round
             uint256 usdMonthlySalaries = self.db.getUSDMonthlySalaries();
             payRound = payRound.add(1);
-            self.unpaidUSDSalaries[payRound] =
-                unpaidUSDSalaries.add(usdMonthlySalaries);
+            self.unpaidUSDSalaries[payRound] = unpaidUSDSalaries.add(
+                usdMonthlySalaries
+            );
 
             self.payRound = payRound;
             if (nextPayDay == 0) {
@@ -163,8 +165,8 @@ library PayrollLibrary {
         internal
     {
         uint delay = 10;
-        var ANT_TO_USD = "json(https://min-api.cryptocompare.com/data/price?fsym=ANT&tsyms=USD).USD";
-        var ETH_TO_USD = "json(https://min-api.cryptocompare.com/data/price?fsym=ETH&tsyms=USD).USD";
+        string memory ANT_TO_USD = "json(https://min-api.cryptocompare.com/data/price?fsym=ANT&tsyms=USD).USD";
+        string memory ETH_TO_USD = "json(https://min-api.cryptocompare.com/data/price?fsym=ETH&tsyms=USD).USD";
 
         bytes32 antId = oraclizeLib.oraclize_query(delay, "URL", ANT_TO_USD);
         bytes32 ethId = oraclizeLib.oraclize_query(delay, "URL", ETH_TO_USD);
@@ -224,8 +226,9 @@ library PayrollLibrary {
         uint256 payRound = self.payRound;
         uint256 leftUSDSalary = monthlyUSDSalary;
 
-        self.unpaidUSDSalaries[payRound] =
-            self.unpaidUSDSalaries[payRound].sub(monthlyUSDSalary);
+        self.unpaidUSDSalaries[payRound] = self.unpaidUSDSalaries[payRound].sub(
+            monthlyUSDSalary
+        );
 
         for (uint i = 0; i < tokens.length; i++) {
             if (leftUSDSalary == 0) {
