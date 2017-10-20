@@ -1,10 +1,13 @@
 # aa-apply
 
-require truffle v3.4.11
-require testrpc v4.1.3
+Update to truffle v4.0beta and introduce solium to lint code.
 
+## run test
 ```
-npm run testrpc
 npm run test
 ```
 
+## run lint
+```
+npm run lint
+```
