@@ -9,6 +9,7 @@ import "./PayrollDB.sol";
 
 import "zeppelin-solidity/contracts/math/SafeMath.sol";
 
+
 library EmployeeLibrary {
 
     using SafeMath for uint256;
@@ -119,7 +120,12 @@ library EmployeeLibrary {
 
         for (uint i = 0; i < tokens.length; i++) {
             tokens[i] = db.getAddressValue(
-                keyHash("/tokens", employeeId, nonce, i)
+                keyHash(
+                    "/tokens",
+                    employeeId,
+                    nonce,
+                    i
+                )
             );
         }
 
@@ -145,7 +151,12 @@ library EmployeeLibrary {
 
         for (uint i = 0; i < tokens.length; i++) {
             allocation[i] = db.getUIntValue(
-                keyHash("/tokens/alloc", employeeId, nonce, tokens[i])
+                keyHash(
+                    "/tokens/alloc",
+                    employeeId,
+                    nonce,
+                    tokens[i]
+                )
             );
         }
 
@@ -231,7 +242,7 @@ library EmployeeLibrary {
     )
         internal
     {
-        uint256 SIX_MONTHS = 4 weeks * 6;
+        uint256 sixMonths = 4 weeks * 6;
 
         PayrollDB db = PayrollDB(_db);
         uint256 distSum = 0;
@@ -245,9 +256,16 @@ library EmployeeLibrary {
         require(tokens.length == distribution.length);
         for (uint i = 0; i < tokens.length; i++) {
             // token should be listed
-            require(db.getBooleanValue(
-                keyHash("/tokens", employeeId, nonce, tokens[i])
-            ));
+            require(
+                db.getBooleanValue(
+                    keyHash(
+                        "/tokens",
+                        employeeId,
+                        nonce,
+                        tokens[i]
+                    )
+                )
+            );
             // single dist should not exceed 100
             require(distribution[i] <= 100);
             distSum = distSum.add(distribution[i]);
@@ -259,12 +277,17 @@ library EmployeeLibrary {
             // first time
             nextAllocTime = now;
         }
-        nextAllocTime = nextAllocTime.add(SIX_MONTHS);
+        nextAllocTime = nextAllocTime.add(sixMonths);
         db.setUIntValue(
             keyHash("/tokens/nextAllocTime", employeeId), nextAllocTime
         );
 
-        setTokensAllocation(_db, employeeId, tokens, distribution);
+        setTokensAllocation(
+            _db,
+            employeeId,
+            tokens,
+            distribution
+        );
     }
 
     function keyHash(string property)
@@ -285,16 +308,38 @@ library EmployeeLibrary {
         return keccak256("/Employee", account, property);
     }
 
-    function keyHash(string property, uint256 id, uint256 nonce, uint idx)
+    function keyHash(
+        string property,
+        uint256 id,
+        uint256 nonce,
+        uint idx
+    )
         private pure returns (bytes32)
     {
-        return keccak256("/Employee", id, property, nonce, idx);
+        return keccak256(
+            "/Employee",
+            id,
+            property,
+            nonce,
+            idx
+        );
     }
 
-    function keyHash(string property, uint256 id, uint256 nonce, address addr)
+    function keyHash(
+        string property,
+        uint256 id,
+        uint256 nonce,
+        address addr
+    )
         private pure returns (bytes32)
     {
-        return keccak256("/Employee", id, property, nonce, addr);
+        return keccak256(
+            "/Employee",
+            id,
+            property,
+            nonce,
+            addr
+        );
     }
 
     function nextId(address db)
@@ -319,10 +364,22 @@ library EmployeeLibrary {
         db.setUIntValue(keyHash("/tokens/count", employeeId), tokens.length);
         for (uint i = 0; i < tokens.length; i++) {
             db.setAddressValue(
-                keyHash("/tokens", employeeId, nonce, i), tokens[i]
+                keyHash(
+                    "/tokens",
+                    employeeId,
+                    nonce,
+                    i
+                ),
+                tokens[i]
             );
             db.setBooleanValue(
-                keyHash("/tokens", employeeId, nonce, tokens[i]), true
+                keyHash(
+                    "/tokens",
+                    employeeId,
+                    nonce,
+                    tokens[i]
+                ),
+                true
             );
         }
     }
@@ -343,7 +400,12 @@ library EmployeeLibrary {
         );
         for (uint i = 0; i < tokens.length; i++) {
             db.setUIntValue(
-                keyHash("/tokens/alloc", employeeId, nonce, tokens[i]),
+                keyHash(
+                    "/tokens/alloc",
+                    employeeId,
+                    nonce,
+                    tokens[i]
+                ),
                 distribution[i]
             );
             OnAllocationChanged(employeeId, tokens[i], distribution[i]);
