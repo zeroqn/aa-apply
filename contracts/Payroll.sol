@@ -12,6 +12,7 @@ import "./mocks/ANTToken.sol";
 import "zeppelin-solidity/contracts/ownership/Ownable.sol";
 import "zeppelin-solidity/contracts/lifecycle/Pausable.sol";
 
+
 contract Payroll is Ownable, Pausable {
 
     using EmployeeLibrary for address;
@@ -40,7 +41,7 @@ contract Payroll is Ownable, Pausable {
         address token,
         uint256 alloc
     );
-    event OnPaid(uint256 indexed employeeId, uint256 indexed USDSalary);
+    event OnPaid(uint256 indexed employeeId, uint256 indexed monthlyUSDSalary);
 
     function Payroll(address _db, address antToken, address usdToken)
         public
@@ -63,11 +64,11 @@ contract Payroll is Ownable, Pausable {
     }
 
     function getEmployee(uint256 employeeId)
-        external view returns (bool active,
-                                   address employee,
-                                   uint256 yearlyUSDSalary)
+        external view returns (bool, address, uint256)
     {
-        (active,employee,,yearlyUSDSalary) = payroll.db.getEmployee(employeeId);
+        var (active,employee,,yearlyUSDSalary) = payroll.db.getEmployee(
+            employeeId
+        );
         return (active, employee, yearlyUSDSalary);
     }
 
@@ -111,9 +112,11 @@ contract Payroll is Ownable, Pausable {
         onlyOwner
         external
     {
-        payroll.db.addEmployee(accountAddress,
-                               allowedTokens,
-                               initialYearlyUSDSalary);
+        payroll.db.addEmployee(
+            accountAddress,
+            allowedTokens,
+            initialYearlyUSDSalary
+        );
     }
 
     function setEmployeeSalary(uint256 employeeId, uint256 yearlyUSDSalary)

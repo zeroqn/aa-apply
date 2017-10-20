@@ -330,7 +330,8 @@ contract('Payroll', (accounts) => {
 
     assert.equal(events.length, 1);
     assert.equal(events[0].args.employeeId.toNumber(), testEmployeeId);
-    assert.equal(events[0].args.USDSalary.toNumber(), testYearlyUSDSalary / 12);
+    assert.equal(events[0].args.monthlyUSDSalary.toNumber(),
+      testYearlyUSDSalary / 12);
 
     amount = await helper.getBalance(payroll.address);
     assert.equal(amount.toNumber(), tokenAmount - 30);
@@ -356,7 +357,8 @@ contract('Payroll', (accounts) => {
 
     assert.equal(events.length, 1);
     assert.equal(events[0].args.employeeId.toNumber(), testEmployeeId);
-    assert.equal(events[0].args.USDSalary.toNumber(), testYearlyUSDSalary / 12);
+    assert.equal(events[0].args.monthlyUSDSalary.toNumber(),
+      testYearlyUSDSalary / 12);
   });
 
   it('should not pay from sender other than employee', async () => {

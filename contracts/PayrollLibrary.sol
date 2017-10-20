@@ -39,7 +39,7 @@ library PayrollLibrary {
         mapping (bytes32 => uint256) isOracleId;
     }
 
-    event OnPaid(uint256 indexed employeeId, uint256 indexed USDSalary);
+    event OnPaid(uint256 indexed employeeId, uint256 indexed monthlyUSDSalary);
 
     /// @dev Calculate Monthly USD amount spent in salaries
     /// @param self Payroll Payroll data struct
