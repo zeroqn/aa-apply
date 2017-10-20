@@ -8,6 +8,7 @@ pragma solidity ^0.4.17;
  * Also lets assume we can 100% trust the exchange rate oracle.
  */
 
+
 contract PayrollInterface {
 
     /* OWNER ONLY */
@@ -16,10 +17,12 @@ contract PayrollInterface {
         address[] allowedTokens,
         uint256   initialYearlyUSDSalary
     ) external;
+
     function setEmployeeSalary(
         uint256 employeeId,
         uint256 yearlyUSDSalary
     ) external;
+
     function removeEmployee(uint256 employeeId) external;
 
     function addFunds() payable external;
@@ -44,6 +47,7 @@ contract PayrollInterface {
         address[] tokens,
         uint256[] distribution
     ) external;
+
     // @notice Only callable once a month
     function payday() external;
 

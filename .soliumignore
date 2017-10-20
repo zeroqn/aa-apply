@@ -1,3 +1,4 @@
 node_modules
 contracts/Migrations.sol
 contracts/oraclizeAPI.lib.sol
+contracts/PayrollInterface.sol
