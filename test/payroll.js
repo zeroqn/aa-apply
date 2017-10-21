@@ -2,6 +2,7 @@ const ANTToken = artifacts.require('ANTToken');
 const USDToken = artifacts.require('USDToken');
 const Payroll = artifacts.require('Payroll');
 const PayrollDB = artifacts.require('PayrollDB');
+const EscapeHatch = artifacts.require('EscapeHatch');
 
 const helper = require('./helper');
 
@@ -16,6 +17,7 @@ contract('Payroll', (accounts) => {
   let allowedTokens;
   let payroll;
   let testEmployeeId;
+  let hatch;
 
   before(async () => {
     antToken = await ANTToken.deployed();
@@ -25,7 +27,10 @@ contract('Payroll', (accounts) => {
 
   beforeEach(async () => {
     let db = await PayrollDB.new();
-    payroll = await Payroll.new(db.address, antToken.address, usdToken.address);
+    hatch = await EscapeHatch.new();
+    payroll = await Payroll.new(db.address, antToken.address, usdToken.address,
+      hatch.address);
+    await hatch.setPayroll(payroll.address);
 
     // 200 ETH + 200 USD + 200 ANT
     await antToken.mint(payroll.address, tokenAmount);
@@ -158,9 +163,9 @@ contract('Payroll', (accounts) => {
     assert.equal(amount.toNumber(), 10000 + tokenAmount);
   });
 
-  it('should pause contract after call escapeHatch', async () => {
+  it('should pause contract after call pause', async () => {
     let events;
-    await payroll.escapeHatch({from: owner});
+    await payroll.pause({from: owner});
     events = await helper.getEvents(payroll.Pause());
 
     assert.equal(events.length, 1);
@@ -168,7 +173,7 @@ contract('Payroll', (accounts) => {
   });
 
   it('should not pause contract from sender other than owner', async () => {
-    await helper.assertThrow(payroll.escapeHatch, {from: testEmployee});
+    await helper.assertThrow(payroll.pause, {from: testEmployee});
   });
 
   it('should return monthly salaries burnrate', async () => {
@@ -177,7 +182,7 @@ contract('Payroll', (accounts) => {
     assert.equal(burnrate.toNumber(), testYearlyUSDSalary / 12);
   });
 
-  it('should allow emergency withdraw after escapeHatch', async () => {
+  it('should allow emergency withdraw after pause', async () => {
     let amount;
     let prevANTAmount;
     let prevUSDAmount;
@@ -193,7 +198,7 @@ contract('Payroll', (accounts) => {
     prevANTAmount = await antToken.balanceOf(owner);
     prevUSDAmount = await usdToken.balanceOf(owner);
 
-    await payroll.escapeHatch({from: owner});
+    await payroll.pause({from: owner});
     await payroll.emergencyWithdraw({from: owner})
 
     amount = await helper.getBalance(payroll.address);
@@ -211,7 +216,7 @@ contract('Payroll', (accounts) => {
 
   it('should not allow emergencyWithdraw from sender other than owner',
     async () => {
-      await payroll.escapeHatch({from: owner});
+      await payroll.pause({from: owner});
       await helper.assertThrow(payroll.emergencyWithdraw, {from: testEmployee});
     });
 
@@ -308,9 +313,9 @@ contract('Payroll', (accounts) => {
         [antToken.address, usdToken.address], [20, 50], {from: owner});
     });
 
-  it('should not change employee salary alloc after escapeHatch',
+  it('should not change employee salary alloc after pause',
     async () => {
-      await payroll.escapeHatch({from: owner});
+      await payroll.pause({from: owner});
       await helper.assertThrow(payroll.determineAllocation,
         [antToken.address, usdToken.address], [20, 50], {from: testEmployee});
     });
@@ -326,21 +331,38 @@ contract('Payroll', (accounts) => {
     await payroll.determineAllocation([antToken.address, usdToken.address],
       [20, 20], {from: testEmployee});
     await payroll.payday({from: testEmployee});
-    events = await helper.getEvents(payroll.OnPaid());
 
+    events = await helper.getEvents(payroll.OnPaid());
     assert.equal(events.length, 1);
     assert.equal(events[0].args.employeeId.toNumber(), testEmployeeId);
     assert.equal(events[0].args.monthlyUSDSalary.toNumber(),
       testYearlyUSDSalary / 12);
 
+    events = await helper.getEvents(hatch.OnQuarantineToken());
+    assert.equal(events.length, 2);
+    assert.equal(events[0].args.employee, testEmployee);
+    assert.equal(events[0].args.token, antToken.address);
+    assert.equal(events[0].args.amount.toNumber(), 10);
+    assert.equal(events[1].args.employee, testEmployee);
+    assert.equal(events[1].args.token, usdToken.address);
+    assert.equal(events[1].args.amount.toNumber(), 20);
+
+    events = await helper.getEvents(hatch.OnQuarantineEth());
+    assert.equal(events.length, 1);
+    assert.equal(events[0].args.employee, testEmployee);
+    assert.equal(events[0].args.amount.toNumber(), 30);
+
+    amount = await helper.getBalance(hatch.address);
+    assert.equal(amount.toNumber(), 30);
+    amount = await antToken.balanceOf(hatch.address);
+    assert.equal(amount.toNumber(), 10);
+    amount = await usdToken.balanceOf(hatch.address);
+    assert.equal(amount.toNumber(), 20);
+
     amount = await helper.getBalance(payroll.address);
     assert.equal(amount.toNumber(), tokenAmount - 30);
-    amount = await antToken.balanceOf(testEmployee);
-    assert.equal(amount.toNumber(), 10);
     amount = await antToken.balanceOf(payroll.address);
     assert.equal(amount.toNumber(), tokenAmount - 10);
-    amount = await usdToken.balanceOf(testEmployee);
-    assert.equal(amount.toNumber(), 20);
     amount = await usdToken.balanceOf(payroll.address);
     assert.equal(amount.toNumber(), tokenAmount - 20);
   });
@@ -365,9 +387,100 @@ contract('Payroll', (accounts) => {
     await helper.assertThrow(payroll.payday, {from: owner});
   });
 
+  it('should not pay employee after pause', async () => {
+    await payroll.pause({from: owner});
+    await helper.assertThrow(payroll.payday, {from: testEmployee});
+  });
+
   it('should not pay employee after escapeHatch', async () => {
     await payroll.escapeHatch({from: owner});
     await helper.assertThrow(payroll.payday, {from: testEmployee});
   });
+
+  it('should not able to call escape hatch from sender other than owner',
+    async () => {
+      await helper.assertThrow(payroll.escapeHatch, {from: testEmployee});
+    });
+
+  it('should not pay employee if hatch is paused', async () => {
+    await hatch.pause({from: owner});
+    await helper.assertThrow(payroll.payday, {from: testEmployee});
+  });
+
+  it('should allow employee withdraw salary from hatch after quarantine',
+    async () => {
+      let events;
+      let amount;
+
+      // 1200 yearly salary / 12 => 100 monthly salary
+      // 20% in USD  => 20 USD
+      // 20% in ANT => 20 USD => 20 / 2 => 10 ANT
+      // 60% in ETH => 60 USD => 60 / 2 => 30 ETH
+      await payroll.determineAllocation([antToken.address, usdToken.address],
+        [20, 20], {from: testEmployee});
+      await payroll.payday({from: testEmployee});
+
+      await helper.assertThrow(hatch.withdraw, {from: testEmployee});
+      await helper.timeJump(60 * 60 * 25);
+      await hatch.withdraw({from: testEmployee});
+
+      events = await helper.getEvents(hatch.OnWithdraw());
+      assert.equal(events.length, 1);
+      assert.equal(events[0].args.employee, testEmployee);
+
+      amount = await antToken.balanceOf(testEmployee);
+      assert.equal(amount.toNumber(), 10);
+      amount = await usdToken.balanceOf(testEmployee);
+      assert.equal(amount.toNumber(), 20);
+    });
+
+  it('should not allow withdraw if hatch is paused', async () => {
+    await payroll.payday({from: testEmployee});
+    await helper.timeJump(60 * 60 * 25);
+    await hatch.pause({from: owner});
+    await helper.assertThrow(hatch.withdraw, {from: testEmployee});
+  });
+
+  it('should allow emergency withdraw from hatch if paused', async () => {
+    let events;
+    let amount;
+    let prevANTAmount;
+    let prevUSDAmount;
+
+    // 1200 yearly salary / 12 => 100 monthly salary
+    // 20% in USD  => 20 USD
+    // 20% in ANT => 20 USD => 20 / 2 => 10 ANT
+    // 60% in ETH => 60 USD => 60 / 2 => 30 ETH
+    await payroll.determineAllocation([antToken.address, usdToken.address],
+      [20, 20], {from: testEmployee});
+    await payroll.payday({from: testEmployee});
+    await hatch.pause({from: owner});
+
+    prevANTAmount = await antToken.balanceOf(owner);
+    prevUSDAmount = await usdToken.balanceOf(owner);
+    await hatch.emergencyWithdraw({from: owner});
+
+    events = await helper.getEvents(hatch.OnEmergencyWithdraw());
+    assert.equal(events.length, 1);
+    assert.equal(events[0].event, 'OnEmergencyWithdraw');
+
+    amount = await antToken.balanceOf(owner);
+    assert.equal(amount.toNumber(), prevANTAmount.toNumber() + 10);
+    amount = await usdToken.balanceOf(owner);
+    assert.equal(amount.toNumber(), prevUSDAmount.toNumber() + 20);
+  });
+
+  it('should not allow emergency withdraw from hatch if its not paused',
+    async () => {
+      await payroll.payday({from: testEmployee});
+      await helper.assertThrow(hatch.emergencyWithdraw, {from: owner});
+    });
+
+  it('should not allow emergency withdraw from hatch other than owner',
+    async () => {
+      await payroll.payday({from: testEmployee});
+      await hatch.pause({from: owner});
+      await helper.assertThrow(hatch.emergencyWithdraw, {from: testEmployee});
+    });
 
 });

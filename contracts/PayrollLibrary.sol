@@ -6,9 +6,9 @@ pragma solidity ^0.4.17;
  */
 
 import "./EmployeeLibrary.sol";
+import "./EscapeHatch.sol";
 
-import "./mocks/USDToken.sol";
-import "./mocks/ANTToken.sol";
+import "zeppelin-solidity/contracts/token/ERC20.sol";
 import "./oraclizeAPI.lib.sol";
 import "zeppelin-solidity/contracts/math/SafeMath.sol";
 
@@ -25,6 +25,7 @@ library PayrollLibrary {
         address usdToken;
         // ANT token
         address antToken;
+        address escapeHatch;
 
         uint256 nextPayDay;
         uint256 payRound;
@@ -59,11 +60,11 @@ library PayrollLibrary {
         internal view returns (uint256)
     {
         uint256 unpaidUSDSalaries = self.unpaidUSDSalaries[self.payRound];
-        uint256 usdFunds = USDToken(self.usdToken).balanceOf(this);
+        uint256 usdFunds = ERC20(self.usdToken).balanceOf(this);
 
         // ANT token (x USD to 1 ANT)
         uint256 antExchangeRate = self.exchangeRates[self.antToken];
-        uint256 antFunds = ANTToken(self.antToken).balanceOf(this);
+        uint256 antFunds = ERC20(self.antToken).balanceOf(this);
         // antFunds * antExchangeRate
         usdFunds = usdFunds.add(antFunds.mul(antExchangeRate));
 
@@ -121,6 +122,17 @@ library PayrollLibrary {
 
         self.antToken = ant;
         self.usdToken = usd;
+    }
+
+    /// @dev Set escape hatch address
+    /// @param self Payroll Payroll data struct
+    /// @param _escapeHatch address Deployed escape hatch contract address
+    function setEscapeHatch(Payroll storage self, address _escapeHatch)
+        internal
+    {
+        require(_escapeHatch != 0x0);
+
+        self.escapeHatch = _escapeHatch;
     }
 
     /// @dev Pay salary to employee
@@ -224,45 +236,82 @@ library PayrollLibrary {
         var tokens = self.db.getEmployeeTokens(employeeId);
         var tokensAllocation = self.db.getEmployeeTokensAlloc(employeeId);
         uint256 payRound = self.payRound;
-        uint256 leftUSDSalary = monthlyUSDSalary;
 
         self.unpaidUSDSalaries[payRound] = self.unpaidUSDSalaries[payRound].sub(
             monthlyUSDSalary
         );
 
-        for (uint i = 0; i < tokens.length; i++) {
-            if (leftUSDSalary == 0) {
-                break;
-            }
-            if (tokensAllocation[i] == 0) {
-                continue;
-            }
-
-            // monthlyUSDSalary * allocation / 100
-            uint usdAmount = monthlyUSDSalary.mul(tokensAllocation[i]).div(100);
-            leftUSDSalary = leftUSDSalary.sub(usdAmount);
-
-            if (tokens[i] == self.usdToken) {
-                USDToken(self.usdToken).transfer(account, usdAmount);
-            } else {
-                // ANT token (x USD to 1 ANT)
-                uint antExchangeRate = self.exchangeRates[tokens[i]];
-                // usdAmount / antExchangeRate
-                uint antAmount = usdAmount.div(antExchangeRate);
-                ANTToken(self.antToken).transfer(account, antAmount);
-            }
-        }
+        uint256 leftUSDSalary = payInToken(
+            self,
+            account,
+            monthlyUSDSalary,
+            tokens,
+            tokensAllocation
+        );
 
         // handle left ether
+        uint ethAmount = 0;
         if (leftUSDSalary > 0) {
             // x USD to 1 ether
             uint ethExchangeRate = self.exchangeRates[self.usdToken];
             // leftUSDSalary / ethExchangeRate
-            uint etherAmount = leftUSDSalary.div(ethExchangeRate);
-            account.transfer(etherAmount);
+            ethAmount = leftUSDSalary.div(ethExchangeRate);
+            EscapeHatch(self.escapeHatch).quarantine.value(ethAmount)(
+                account,
+                new address[](0),
+                new uint256[](0)
+            );
         }
 
         OnPaid(employeeId, monthlyUSDSalary);
+    }
+
+    /// @dev Pay to employee
+    /// @param self Payroll Payroll data struct
+    /// @param account address employee account address
+    /// @param monthlyUSDSalary uint256 monthly usd salary
+    /// @param tokens address[] allowed tokens
+    /// @param allocation uint256[] tokens allocation
+    /// @return uint256 left unpaid usd salary
+    function payInToken(
+        Payroll storage self,
+        address account,
+        uint256 monthlyUSDSalary,
+        address[] tokens,
+        uint256[] allocation
+    )
+        private returns (uint256)
+    {
+        uint256 leftUSDSalary = monthlyUSDSalary;
+        uint256[] memory payAmounts = new uint256[](tokens.length);
+
+        for (uint i = 0; i < tokens.length; i++) {
+            if (leftUSDSalary == 0) {
+                break;
+            }
+            if (allocation[i] == 0) {
+                continue;
+            }
+
+            // monthlyUSDSalary * allocation / 100
+            uint usdAmount = monthlyUSDSalary.mul(allocation[i]).div(100);
+            leftUSDSalary = leftUSDSalary.sub(usdAmount);
+
+            if (tokens[i] == self.usdToken) {
+                payAmounts[i] = usdAmount;
+                ERC20(self.usdToken).transfer(self.escapeHatch, usdAmount);
+            } else {
+                // XXX token (x USD to 1 XXX)
+                uint exRate = self.exchangeRates[tokens[i]];
+                // usdAmount / exRate
+                uint tAmount = usdAmount.div(exRate);
+                payAmounts[i] = tAmount;
+                ERC20(self.antToken).transfer(self.escapeHatch, tAmount);
+            }
+        }
+
+        EscapeHatch(self.escapeHatch).quarantine(account, tokens, payAmounts);
+        return leftUSDSalary;
     }
 
 }

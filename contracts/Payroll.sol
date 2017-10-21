@@ -6,14 +6,12 @@ pragma solidity ^0.4.17;
 
 import "./EmployeeLibrary.sol";
 import "./PayrollLibrary.sol";
+import "./SharedLibrary.sol";
 
-import "./mocks/USDToken.sol";
-import "./mocks/ANTToken.sol";
-import "zeppelin-solidity/contracts/ownership/Ownable.sol";
 import "zeppelin-solidity/contracts/lifecycle/Pausable.sol";
 
 
-contract Payroll is Ownable, Pausable {
+contract Payroll is Pausable {
 
     using EmployeeLibrary for address;
     using PayrollLibrary for PayrollLibrary.Payroll;
@@ -43,12 +41,18 @@ contract Payroll is Ownable, Pausable {
     );
     event OnPaid(uint256 indexed employeeId, uint256 indexed monthlyUSDSalary);
 
-    function Payroll(address _db, address antToken, address usdToken)
+    function Payroll(
+        address _db,
+        address antToken,
+        address usdToken,
+        address escapeHatch
+    )
         public
     {
         // constructor
         payroll.setDBAddress(_db);
         payroll.setTokenAddresses(antToken, usdToken);
+        payroll.setEscapeHatch(escapeHatch);
     }
 
     function getEmployeeCount()
@@ -145,7 +149,7 @@ contract Payroll is Ownable, Pausable {
         onlyOwner
         external
     {
-        pause();
+        EscapeHatch(payroll.escapeHatch).pauseFromPayroll();
     }
 
     function emergencyWithdraw()
@@ -153,14 +157,10 @@ contract Payroll is Ownable, Pausable {
         whenPaused
         external
     {
-        ANTToken antToken = ANTToken(payroll.antToken);
-        USDToken usdToken = USDToken(payroll.usdToken);
-        uint256 antAmount = antToken.balanceOf(this);
-        uint256 usdAmount = usdToken.balanceOf(this);
-
-        msg.sender.transfer(this.balance);
-        antToken.transfer(msg.sender, antAmount);
-        usdToken.transfer(msg.sender, usdAmount);
+        address[] memory tokens = new address[](2);
+        tokens[0] = payroll.antToken;
+        tokens[1] = payroll.usdToken;
+        SharedLibrary.withdrawFrom(this, tokens);
     }
 
     function determineAllocation(address[] tokens, uint256[] distribution)
