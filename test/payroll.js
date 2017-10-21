@@ -32,12 +32,14 @@ contract('Payroll', (accounts) => {
       hatch.address);
     await hatch.setPayroll(payroll.address);
 
+    let ethAddr = await payroll.ethAddr.call();
+
     // 200 ETH + 200 USD + 200 ANT
     await antToken.mint(payroll.address, tokenAmount);
     await usdToken.mint(payroll.address, tokenAmount);
     await payroll.addFunds({from: testEmployee, value: tokenAmount});
     await payroll.setExchangeRate(antToken.address, exchangeRate);
-    await payroll.setExchangeRate(usdToken.address, exchangeRate);
+    await payroll.setExchangeRate(ethAddr, exchangeRate);
 
     await db.setAllowedContract([payroll.address]);
     await payroll.addEmployee(testEmployee, allowedTokens,

@@ -17,6 +17,8 @@ contract Payroll is Pausable {
     using PayrollLibrary for PayrollLibrary.Payroll;
 
     PayrollLibrary.Payroll public payroll;
+    // special value is used to reference ETH => USD exchange rate
+    address public ethAddr = 0xeeee;
 
     modifier onlyEmployee() {
         require(payroll.db.isEmployee());
@@ -51,7 +53,7 @@ contract Payroll is Pausable {
     {
         // constructor
         payroll.setDBAddress(_db);
-        payroll.setTokenAddresses(antToken, usdToken);
+        payroll.setTokenAddresses(antToken, usdToken, ethAddr);
         payroll.setEscapeHatch(escapeHatch);
     }
 
@@ -105,7 +107,7 @@ contract Payroll is Pausable {
         onlyOwner
         external
     {
-        payroll.setTokenAddresses(ant, usd);
+        payroll.setTokenAddresses(ant, usd, ethAddr);
     }
 
     function addEmployee(

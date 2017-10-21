@@ -25,6 +25,8 @@ library PayrollLibrary {
         address usdToken;
         // ANT token
         address antToken;
+        // special value reference to ETH => USD exchange rate
+        address eth;
         address escapeHatch;
 
         uint256 nextPayDay;
@@ -34,7 +36,8 @@ library PayrollLibrary {
         mapping (uint256 => uint256) unpaidUSDSalaries;
         // exchange rates
         // x USD to 1 ANT
-        // x USD to 1 ether
+        // x USD to 1 ETH (ETH use 0xeth special address)
+        // 1 USD to 1 USD
         mapping (address => uint256) exchangeRates;
         // payRound => (account => isPaid)
         mapping (uint256 => mapping (address => bool)) payStats;
@@ -68,10 +71,10 @@ library PayrollLibrary {
         // antFunds * antExchangeRate
         usdFunds = usdFunds.add(antFunds.mul(antExchangeRate));
 
-        // ether (x USD to 1 ether)
-        uint256 usdExchangeRate = self.exchangeRates[self.usdToken];
-        // etherFunds * usdExchangeRate
-        usdFunds = usdFunds.add(this.balance.mul(usdExchangeRate));
+        // ETH (x USD to 1 ETH)
+        uint256 ethExchangeRate = self.exchangeRates[self.eth];
+        // ethFunds * ethExchangeRate
+        usdFunds = usdFunds.add(this.balance.mul(ethExchangeRate));
 
         usdFunds = usdFunds.sub(unpaidUSDSalaries);
         uint256 usdMonthlySalaries = self.db.getUSDMonthlySalaries();
@@ -113,15 +116,25 @@ library PayrollLibrary {
 
     /// @dev Set ANT token and USD token addresses
     /// @param self Payroll Payroll data struct
-    /// @param ant address Deployed ANT token address
-    /// @param usd address Deployed USD token address
-    function setTokenAddresses(Payroll storage self, address ant, address usd)
+    /// @param _ant address Deployed ANT token address
+    /// @param _usd address Deployed USD token address
+    /// @param _eth address special value reference ETH => USD exchange rate
+    function setTokenAddresses(
+        Payroll storage self,
+        address _ant,
+        address _usd,
+        address _eth
+    )
         internal
     {
-        require(ant != 0x0 && usd != 0x0);
+        require(_ant != 0x0 && _usd != 0x0);
 
-        self.antToken = ant;
-        self.usdToken = usd;
+        self.antToken = _ant;
+        self.usdToken = _usd;
+        self.eth = _eth;
+
+        // set up default rate to 1 USD to 1 USD for usdToken
+        setExchangeRate(self, _usd, 1);
     }
 
     /// @dev Set escape hatch address
@@ -206,7 +219,7 @@ library PayrollLibrary {
         if (self.isOracleId[id] == 1) {
             setExchangeRate(self, self.antToken, rate);
         } else if (self.isOracleId[id] == 2) {
-            setExchangeRate(self, self.usdToken, rate);
+            setExchangeRate(self, self.eth, rate);
         }
     }
 
@@ -253,7 +266,7 @@ library PayrollLibrary {
         uint ethAmount = 0;
         if (leftUSDSalary > 0) {
             // x USD to 1 ether
-            uint ethExchangeRate = self.exchangeRates[self.usdToken];
+            uint ethExchangeRate = self.exchangeRates[self.eth];
             // leftUSDSalary / ethExchangeRate
             ethAmount = leftUSDSalary.div(ethExchangeRate);
             EscapeHatch(self.escapeHatch).quarantine.value(ethAmount)(
@@ -297,17 +310,12 @@ library PayrollLibrary {
             uint usdAmount = monthlyUSDSalary.mul(allocation[i]).div(100);
             leftUSDSalary = leftUSDSalary.sub(usdAmount);
 
-            if (tokens[i] == self.usdToken) {
-                payAmounts[i] = usdAmount;
-                ERC20(self.usdToken).transfer(self.escapeHatch, usdAmount);
-            } else {
-                // XXX token (x USD to 1 XXX)
-                uint exRate = self.exchangeRates[tokens[i]];
-                // usdAmount / exRate
-                uint tAmount = usdAmount.div(exRate);
-                payAmounts[i] = tAmount;
-                ERC20(self.antToken).transfer(self.escapeHatch, tAmount);
-            }
+            // XXX token (x USD to 1 XXX)
+            uint exRate = self.exchangeRates[tokens[i]];
+            // usdAmount / exRate
+            uint tAmount = usdAmount.div(exRate);
+            payAmounts[i] = tAmount;
+            ERC20(tokens[i]).transfer(self.escapeHatch, tAmount);
         }
 
         EscapeHatch(self.escapeHatch).quarantine(account, tokens, payAmounts);
