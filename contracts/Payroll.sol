@@ -4,16 +4,13 @@ pragma solidity ^0.4.17;
  * @title Payroll
  */
 
-import "./EmployeeLibrary.sol";
 import "./PayrollLibrary.sol";
-import "./SharedLibrary.sol";
 
 import "zeppelin-solidity/contracts/lifecycle/Pausable.sol";
 
 
 contract Payroll is Pausable {
 
-    using EmployeeLibrary for address;
     using PayrollLibrary for PayrollLibrary.Payroll;
 
     PayrollLibrary.Payroll public payroll;
@@ -21,7 +18,7 @@ contract Payroll is Pausable {
     address public ethAddr = 0xeeee;
 
     modifier onlyEmployee() {
-        require(payroll.db.isEmployee());
+        require(payroll.isEmployee());
         _;
     }
 
@@ -60,22 +57,19 @@ contract Payroll is Pausable {
     function getEmployeeCount()
         external view returns (uint256)
     {
-        return payroll.db.getEmployeeCount();
+        return payroll.getEmployeeCount();
     }
 
     function getEmployeeId(address account)
         external view returns (uint256)
     {
-        return payroll.db.getEmployeeId(account);
+        return payroll.getEmployeeId(account);
     }
 
     function getEmployee(uint256 employeeId)
         external view returns (bool, address, uint256)
     {
-        var (active,employee,,yearlyUSDSalary) = payroll.db.getEmployee(
-            employeeId
-        );
-        return (active, employee, yearlyUSDSalary);
+        return payroll.getEmployee(employeeId);
     }
 
     function calculatePayrollBurnrate()
@@ -118,7 +112,7 @@ contract Payroll is Pausable {
         onlyOwner
         external
     {
-        payroll.db.addEmployee(
+        payroll.addEmployee(
             accountAddress,
             allowedTokens,
             initialYearlyUSDSalary
@@ -129,14 +123,14 @@ contract Payroll is Pausable {
         onlyOwner
         external
     {
-        payroll.db.setEmployeeSalary(employeeId, yearlyUSDSalary);
+        payroll.setEmployeeSalary(employeeId, yearlyUSDSalary);
     }
 
     function removeEmployee(uint256 employeeId)
         onlyOwner
         external
     {
-        payroll.db.removeEmployee(employeeId);
+        payroll.removeEmployee(employeeId);
     }
 
     function addFunds()
@@ -151,7 +145,7 @@ contract Payroll is Pausable {
         onlyOwner
         external
     {
-        EscapeHatch(payroll.escapeHatch).pauseFromPayroll();
+        payroll.escapeHatch();
     }
 
     function emergencyWithdraw()
@@ -159,10 +153,7 @@ contract Payroll is Pausable {
         whenPaused
         external
     {
-        address[] memory tokens = new address[](2);
-        tokens[0] = payroll.antToken;
-        tokens[1] = payroll.usdToken;
-        SharedLibrary.withdrawFrom(this, tokens);
+        payroll.emergencyWithdraw();
     }
 
     function determineAllocation(address[] tokens, uint256[] distribution)
@@ -170,7 +161,7 @@ contract Payroll is Pausable {
         whenNotPaused
         external
     {
-        payroll.db.setEmployeeTokenAllocation(tokens, distribution);
+        payroll.determineAllocation(tokens, distribution);
     }
 
     function payday()
