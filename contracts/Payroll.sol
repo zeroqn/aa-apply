@@ -4,21 +4,21 @@ pragma solidity ^0.4.17;
  * @title Payroll
  */
 
-import "./PayrollLibrary.sol";
+import "./EmployeeServ.sol";
+import "./PaymentServ.sol";
 
 import "zeppelin-solidity/contracts/lifecycle/Pausable.sol";
 
 
 contract Payroll is Pausable {
 
-    using PayrollLibrary for PayrollLibrary.Payroll;
-
-    PayrollLibrary.Payroll public payroll;
-    // special value is used to reference ETH => USD exchange rate
-    address public ethAddr = 0xeeee;
+    address public employeeServ;
+    address public paymentServ;
 
     modifier onlyEmployee() {
-        require(payroll.isEmployee());
+        require(
+            EmployeeServ(employeeServ).isEmployee(msg.sender)
+        );
         _;
     }
 
@@ -32,76 +32,72 @@ contract Payroll is Pausable {
         uint256 indexed yearlyUSDSalary
     );
     event OnEmployeeRemoved(uint256 indexed employeeId);
-    event OnEthFundsAdded(address account, uint256 indexed ethfunds);
     event OnAllocationChanged(
         uint256 indexed employeeId,
         address token,
         uint256 alloc
     );
+    event OnEthFundsAdded(address indexed from, uint256 indexed amount);
     event OnPaid(uint256 indexed employeeId, uint256 indexed monthlyUSDSalary);
 
     function Payroll(
-        address _db,
-        address antToken,
-        address usdToken,
-        address escapeHatch
+        address _employeeServ,
+        address _paymentServ
     )
         public
     {
         // constructor
-        payroll.setDBAddress(_db);
-        payroll.setTokenAddresses(antToken, usdToken, ethAddr);
-        payroll.setEscapeHatch(escapeHatch);
+        employeeServ = _employeeServ;
+        paymentServ = _paymentServ;
     }
 
     function getEmployeeCount()
         external view returns (uint256)
     {
-        return payroll.getEmployeeCount();
+        return EmployeeServ(employeeServ).getEmployeeCount();
     }
 
     function getEmployeeId(address account)
         external view returns (uint256)
     {
-        return payroll.getEmployeeId(account);
+        return EmployeeServ(employeeServ).getEmployeeId(account);
     }
 
     function getEmployee(uint256 employeeId)
         external view returns (bool, address, uint256)
     {
-        return payroll.getEmployee(employeeId);
+        EmployeeServ serv = EmployeeServ(employeeServ);
+        var (active,account,,yearlyUSDSalary) = serv.getEmployee(employeeId);
+
+        return (active, account, yearlyUSDSalary);
     }
 
     function calculatePayrollBurnrate()
         external view returns (uint256)
     {
-        return payroll.calculatePayrollBurnrate();
+        return PaymentServ(paymentServ).calculatePayrollBurnrate();
     }
 
     function calculatePayrollRunway()
         external view returns (uint256)
     {
-        return payroll.calculatePayrollRunway();
+        return PaymentServ(paymentServ).calculatePayrollRunway();
     }
 
     function calculatePayrollRunwayInMonths()
         external view returns (uint256)
     {
-        return payroll.calculatePayrollRunwayInMonths();
+        return PaymentServ(paymentServ).calculatePayrollRunwayInMonths();
     }
 
-    function setDBAddress(address _db)
+    function setServices(address _employeeServ, address _paymentServ)
         onlyOwner
         external
     {
-        payroll.setDBAddress(_db);
-    }
+        require(_employeeServ != 0x0 && _paymentServ != 0x0);
 
-    function setTokenAddresses(address ant, address usd)
-        onlyOwner
-        external
-    {
-        payroll.setTokenAddresses(ant, usd, ethAddr);
+        employeeServ = _employeeServ;
+        paymentServ = _paymentServ;
     }
 
     function addEmployee(
@@ -112,32 +108,41 @@ contract Payroll is Pausable {
         onlyOwner
         external
     {
-        payroll.addEmployee(
+        uint256 id = EmployeeServ(employeeServ).addEmployee(
             accountAddress,
             allowedTokens,
             initialYearlyUSDSalary
         );
+
+        OnEmployeeAdded(id, accountAddress, initialYearlyUSDSalary);
     }
 
     function setEmployeeSalary(uint256 employeeId, uint256 yearlyUSDSalary)
         onlyOwner
         external
     {
-        payroll.setEmployeeSalary(employeeId, yearlyUSDSalary);
+        EmployeeServ(employeeServ).setEmployeeSalary(
+            employeeId,
+            yearlyUSDSalary
+        );
+
+        OnEmployeeSalaryUpdated(employeeId, yearlyUSDSalary);
     }
 
     function removeEmployee(uint256 employeeId)
         onlyOwner
         external
     {
-        payroll.removeEmployee(employeeId);
+        EmployeeServ(employeeServ).removeEmployee(employeeId);
+
+        OnEmployeeRemoved(employeeId);
     }
 
     function addFunds()
         payable
-        external
+        public
     {
-        require(msg.value > 0);
+        PaymentServ(paymentServ).addFunds.value(msg.value)(msg.sender);
         OnEthFundsAdded(msg.sender, msg.value);
     }
 
@@ -145,7 +150,7 @@ contract Payroll is Pausable {
         onlyOwner
         external
     {
-        payroll.escapeHatch();
+        PaymentServ(paymentServ).escapeHatch();
     }
 
     function emergencyWithdraw()
@@ -153,7 +158,7 @@ contract Payroll is Pausable {
         whenPaused
         external
     {
-        payroll.emergencyWithdraw();
+        PaymentServ(paymentServ).emergencyWithdraw(msg.sender);
     }
 
     function determineAllocation(address[] tokens, uint256[] distribution)
@@ -161,7 +166,17 @@ contract Payroll is Pausable {
         whenNotPaused
         external
     {
-        payroll.determineAllocation(tokens, distribution);
+        EmployeeServ eServ = EmployeeServ(employeeServ);
+        eServ.determineAllocation(
+            msg.sender,
+            tokens,
+            distribution
+        );
+
+        uint256 id = eServ.getEmployeeId(msg.sender);
+        for (uint i = 0; i < tokens.length; i++) {
+            OnAllocationChanged(id, tokens[i], distribution[i]);
+        }
     }
 
     function payday()
@@ -169,19 +184,28 @@ contract Payroll is Pausable {
         whenNotPaused
         external
     {
-        payroll.payday();
+        EmployeeServ eServ = EmployeeServ(employeeServ);
+        uint256 id = eServ.getEmployeeId(msg.sender);
+        var (,account,monthlyUSDSalary,) = eServ.getEmployee(id);
+
+        PaymentServ(paymentServ).payday(id, account, monthlyUSDSalary);
+        OnPaid(id, monthlyUSDSalary);
     }
 
     function updateExchangeRates()
         external
     {
-        payroll.updateExchangeRates();
+        PaymentServ(paymentServ).updateExchangeRates();
     }
 
     function __callback(bytes32 id, string result)
         external
     {
-        payroll.setExchangeRateByOraclize(id, result);
+        PaymentServ(paymentServ).setExchangeRateByOraclize(
+            msg.sender,
+            id,
+            result
+        );
     }
 
     /// @notice oraclize use __callback to import data. I haven't found
@@ -191,7 +215,14 @@ contract Payroll is Pausable {
         onlyOwner
         external
     {
-        payroll.setExchangeRate(token, usdExchangeRate);
+        PaymentServ(paymentServ).setExchangeRate(token, usdExchangeRate);
+    }
+
+    function ()
+        payable
+        external
+    {
+        addFunds();
     }
 
 }

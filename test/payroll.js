@@ -3,6 +3,8 @@ const USDToken = artifacts.require('USDToken');
 const Payroll = artifacts.require('Payroll');
 const PayrollDB = artifacts.require('PayrollDB');
 const EscapeHatch = artifacts.require('EscapeHatch');
+const EmployeeServ = artifacts.require('EmployeeServ');
+const PaymentServ = artifacts.require('PaymentServ');
 
 const helper = require('./helper');
 
@@ -18,6 +20,8 @@ contract('Payroll', (accounts) => {
   let payroll;
   let testEmployeeId;
   let hatch;
+  let employeeServ;
+  let paymentServ;
 
   before(async () => {
     antToken = await ANTToken.deployed();
@@ -28,20 +32,25 @@ contract('Payroll', (accounts) => {
   beforeEach(async () => {
     let db = await PayrollDB.new();
     hatch = await EscapeHatch.new();
-    payroll = await Payroll.new(db.address, antToken.address, usdToken.address,
-      hatch.address);
-    await hatch.setPayroll(payroll.address);
+    employeeServ = await EmployeeServ.new(db.address);
+    paymentServ = await PaymentServ.new(db.address, antToken.address,
+      usdToken.address, hatch.address);
+    payroll = await Payroll.new(employeeServ.address, paymentServ.address);
 
-    let ethAddr = await payroll.ethAddr.call();
+    await employeeServ.setPayrollAddress(payroll.address);
+    await paymentServ.setPayrollAddress(payroll.address);
+    await hatch.setPayment(paymentServ.address);
+    await db.setAllowedContract([employeeServ.address, paymentServ.address]);
+
+    const ETH_SYM_ADDR = await paymentServ.ETH_SYM_ADDR.call();
 
     // 200 ETH + 200 USD + 200 ANT
-    await antToken.mint(payroll.address, tokenAmount);
-    await usdToken.mint(payroll.address, tokenAmount);
+    await antToken.mint(paymentServ.address, tokenAmount);
+    await usdToken.mint(paymentServ.address, tokenAmount);
     await payroll.addFunds({from: testEmployee, value: tokenAmount});
     await payroll.setExchangeRate(antToken.address, exchangeRate);
-    await payroll.setExchangeRate(ethAddr, exchangeRate);
+    await payroll.setExchangeRate(ETH_SYM_ADDR, exchangeRate);
 
-    await db.setAllowedContract([payroll.address]);
     await payroll.addEmployee(testEmployee, allowedTokens,
       testYearlyUSDSalary, {from: owner});
     testEmployeeId = await payroll.getEmployeeId(testEmployee);
@@ -157,11 +166,11 @@ contract('Payroll', (accounts) => {
 
     await payroll.addFunds({from: testEmployee, value: 10000});
     events = await helper.getEvents(payroll.OnEthFundsAdded());
-    amount = await helper.getBalance(payroll.address);
+    amount = await helper.getBalance(paymentServ.address);
 
     assert.equal(events.length, 1);
-    assert.equal(events[0].args.account, testEmployee);
-    assert.equal(events[0].args.ethfunds.toNumber(), 10000);
+    assert.equal(events[0].args.from, testEmployee);
+    assert.equal(events[0].args.amount.toNumber(), 10000);
     assert.equal(amount.toNumber(), 10000 + tokenAmount);
   });
 
@@ -191,11 +200,11 @@ contract('Payroll', (accounts) => {
 
     await payroll.addFunds({from: testEmployee, value: 10000});
 
-    amount = await helper.getBalance(payroll.address);
+    amount = await helper.getBalance(paymentServ.address);
     assert.equal(amount.toNumber(), 10000 + tokenAmount);
-    amount = await antToken.balanceOf(payroll.address);
+    amount = await antToken.balanceOf(paymentServ.address);
     assert.equal(amount.toNumber(), tokenAmount);
-    amount = await usdToken.balanceOf(payroll.address);
+    amount = await usdToken.balanceOf(paymentServ.address);
     assert.equal(amount.toNumber(), tokenAmount);
     prevANTAmount = await antToken.balanceOf(owner);
     prevUSDAmount = await usdToken.balanceOf(owner);
@@ -203,11 +212,11 @@ contract('Payroll', (accounts) => {
     await payroll.pause({from: owner});
     await payroll.emergencyWithdraw({from: owner})
 
-    amount = await helper.getBalance(payroll.address);
+    amount = await helper.getBalance(paymentServ.address);
     assert.equal(amount.toNumber(), 0);
-    amount = await antToken.balanceOf(payroll.address);
+    amount = await antToken.balanceOf(paymentServ.address);
     assert.equal(amount.toNumber(), 0);
-    amount = await usdToken.balanceOf(payroll.address);
+    amount = await usdToken.balanceOf(paymentServ.address);
     assert.equal(amount.toNumber(), 0);
 
     amount = await antToken.balanceOf(owner);
@@ -361,11 +370,11 @@ contract('Payroll', (accounts) => {
     amount = await usdToken.balanceOf(hatch.address);
     assert.equal(amount.toNumber(), 20);
 
-    amount = await helper.getBalance(payroll.address);
+    amount = await helper.getBalance(paymentServ.address);
     assert.equal(amount.toNumber(), tokenAmount - 30);
-    amount = await antToken.balanceOf(payroll.address);
+    amount = await antToken.balanceOf(paymentServ.address);
     assert.equal(amount.toNumber(), tokenAmount - 10);
-    amount = await usdToken.balanceOf(payroll.address);
+    amount = await usdToken.balanceOf(paymentServ.address);
     assert.equal(amount.toNumber(), tokenAmount - 20);
   });
 

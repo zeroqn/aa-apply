@@ -1,25 +1,20 @@
 pragma solidity ^0.4.17;
 
-/**
- * @title PayrollLibrary
- * @dev This library implement most of logic code for Payroll contract.
- */
-
+import "./PayrollDB.sol";
+import "./HashLibrary.sol";
 import "./EscapeHatch.sol";
-import "./EmployeeLibrary.sol";
 import "./SharedLibrary.sol";
 
-import "zeppelin-solidity/contracts/token/ERC20.sol";
 import "./oraclizeAPI.lib.sol";
+import "zeppelin-solidity/contracts/token/ERC20.sol";
 import "zeppelin-solidity/contracts/math/SafeMath.sol";
 
 
-library PayrollLibrary {
+library PaymentServLibrary {
 
     using SafeMath for uint256;
-    using EmployeeLibrary for address;
 
-    struct Payroll {
+    struct Payment {
         // PayrollDB
         address db;
         // USD token
@@ -47,62 +42,22 @@ library PayrollLibrary {
 
     event OnPaid(uint256 indexed employeeId, uint256 indexed monthlyUSDSalary);
 
-    /// @dev Check if msg.sender is active employee
-    /// @param self Payroll Payroll data struct
-    function isEmployee(Payroll storage self)
-        internal view returns (bool)
-    {
-        return self.db.isEmployee();
-    }
-
-    /// @dev Get the number of active employee
-    /// @param self Payroll Payroll data struct
-    /// @return uint256 active employee count
-    function getEmployeeCount(Payroll storage self)
-        internal view returns (uint256)
-    {
-        return self.db.getEmployeeCount();
-    }
-
-    /// @dev Get the corresponding employee id
-    /// @param self Payroll Payroll data struct
-    /// @param account address employee account address
-    /// @return uint256 employee id
-    function getEmployeeId(Payroll storage self, address account)
-        internal view returns (uint256)
-    {
-        return self.db.getEmployeeId(account);
-    }
-
-    /// @dev Get employee info for given id
-    /// @param self Payroll Payroll data struct
-    /// @param employeeId uint256 given employee id to query
-    /// @return bool if employee is active
-    /// @return address employee account
-    /// @return uint256 yearly USD salary
-    function getEmployee(Payroll storage self, uint256 employeeId)
-        internal view returns (bool, address, uint256)
-    {
-        var (active,employee,,yearlyUSDSalary) = self.db.getEmployee(
-            employeeId
-        );
-        return (active, employee, yearlyUSDSalary);
-    }
-
     /// @dev Calculate Monthly USD amount spent in salaries
-    /// @param self Payroll Payroll data struct
-    /// @return uint256 monthly USD salaries
-    function calculatePayrollBurnrate(Payroll storage self)
+    /// @param self Payment Payment struct
+    /// @return uint256 total monthly USD salaries
+    function calculatePayrollBurnrate(Payment storage self)
         internal view returns (uint256)
     {
-        return self.db.getUSDMonthlySalaries();
+        return PayrollDB(self.db).getUIntValue(
+            HashLibrary.hash("/USDMonthlySalaries")
+        );
     }
 
     /// @dev Calculate months until the contract run out of funds
     /// @notice We assume the pay day is same for all employees
-    /// @param self Payroll Payroll data struct
+    /// @param self Payment Payment data struct
     /// @return uint256 left months
-    function calculatePayrollRunwayInMonths(Payroll storage self)
+    function calculatePayrollRunwayInMonths(Payment storage self)
         internal view returns (uint256)
     {
         uint256 unpaidUSDSalaries = self.unpaidUSDSalaries[self.payRound];
@@ -120,16 +75,16 @@ library PayrollLibrary {
         usdFunds = usdFunds.add(this.balance.mul(ethExchangeRate));
 
         usdFunds = usdFunds.sub(unpaidUSDSalaries);
-        uint256 usdMonthlySalaries = self.db.getUSDMonthlySalaries();
+        uint256 usdMonthlySalaries = calculatePayrollBurnrate(self);
         // usdFunds / sudMonthlySalaries
         return usdFunds.div(usdMonthlySalaries);
     }
 
     /// @dev Calculate days until the contract run out of funds
     /// @notice We assume the pay day is same for all employees
-    /// @param self Payroll Payroll data struct
+    /// @param self Payment Payment data struct
     /// @return uint256 left days
-    function calculatePayrollRunway(Payroll storage self)
+    function calculatePayrollRunway(Payment storage self)
         internal view returns (uint256)
     {
         uint256 ONE_MONTH = 4 weeks;
@@ -146,10 +101,68 @@ library PayrollLibrary {
         return date.add(leftMonths.mul(ONE_MONTH));
     }
 
+    /// @dev Get all allowed tokens for givem employeId
+    /// @param self Payment Payment struct
+    /// @param employeeId uint256 given id to query
+    /// @return address[] allowed tokens
+    function getEmployeeTokens(Payment storage self, uint256 employeeId)
+        internal view returns (address[] tokens)
+    {
+        PayrollDB db = PayrollDB(self.db);
+        uint256 count = db.getUIntValue(
+            HashLibrary.hash("/tokens/count", employeeId)
+        );
+        uint256 nonce = db.getUIntValue(
+            HashLibrary.hash("/tokens/nonce", employeeId)
+        );
+        tokens = new address[](count);
+
+        for (uint i = 0; i < tokens.length; i++) {
+            tokens[i] = db.getAddressValue(
+                HashLibrary.hash(
+                    "/tokens",
+                    employeeId,
+                    nonce,
+                    i
+                )
+            );
+        }
+
+        return tokens;
+    }
+
+    /// @dev Get tokens allocation for given employeeId
+    /// @param self Payment Payment struct
+    /// @param employeeId uint256 given id to query
+    /// @return uint256[] tokens allocation
+    function getEmployeeTokensAlloc(Payment storage self, uint256 employeeId)
+        internal view returns (uint256[] allocation)
+    {
+        PayrollDB db = PayrollDB(self.db);
+        uint256 nonce = db.getUIntValue(
+            HashLibrary.hash("/tokens/alloc/nonce", employeeId)
+        );
+        var tokens = getEmployeeTokens(self, employeeId);
+        allocation = new uint256[](tokens.length);
+
+        for (uint i = 0; i < tokens.length; i++) {
+            allocation[i] = db.getUIntValue(
+                HashLibrary.hash(
+                    "/tokens/alloc",
+                    employeeId,
+                    nonce,
+                    tokens[i]
+                )
+            );
+        }
+
+        return allocation;
+    }
+
     /// @dev Set PayrollDB address
-    /// @param self Payroll Payroll data struct
+    /// @param self Payment Payment data struct
     /// @param _db address Deployed PayrollDB address
-    function setDBAddress(Payroll storage self, address _db)
+    function setDB(Payment storage self, address _db)
         internal
     {
         require(_db != 0x0);
@@ -158,12 +171,12 @@ library PayrollLibrary {
     }
 
     /// @dev Set ANT token and USD token addresses
-    /// @param self Payroll Payroll data struct
+    /// @param self Payment Payment data struct
     /// @param _ant address Deployed ANT token address
     /// @param _usd address Deployed USD token address
     /// @param _eth address special value reference ETH => USD exchange rate
-    function setTokenAddresses(
-        Payroll storage self,
+    function setTokens(
+        Payment storage self,
         address _ant,
         address _usd,
         address _eth
@@ -181,86 +194,37 @@ library PayrollLibrary {
     }
 
     /// @dev Set escape hatch address
-    /// @param self Payroll Payroll data struct
-    /// @param _escapeHatch address Deployed escape hatch contract address
-    function setEscapeHatch(Payroll storage self, address _escapeHatch)
+    /// @param self Payment Payment data struct
+    /// @param _hatch address Deployed escape hatch contract address
+    function setEscapeHatch(Payment storage self, address _hatch)
         internal
     {
-        require(_escapeHatch != 0x0);
+        require(_hatch != 0x0);
 
-        self.hatch = _escapeHatch;
-    }
-
-    /// @dev Add new employee
-    /// @param self Payroll Payroll data struct
-    /// @param accountAddress address employee address
-    /// @param allowedTokens address[] allowed tokens for salary payment
-    /// @param initialYearlyUSDSalary uint256 salary in USD for year
-    function addEmployee(
-        Payroll storage self,
-        address   accountAddress,
-        address[] allowedTokens,
-        uint256   initialYearlyUSDSalary
-    )
-        internal
-    {
-        self.db.addEmployee(
-            accountAddress,
-            allowedTokens,
-            initialYearlyUSDSalary
-        );
-    }
-
-    /// @dev Set employee yearly salary
-    /// @param self Payroll Payroll data struct
-    /// @param employeeId uint256 give id to query
-    /// @param yearlyUSDSalary uint256 salary in USD for year
-    function setEmployeeSalary(
-        Payroll storage self,
-        uint256 employeeId,
-        uint256 yearlyUSDSalary
-    )
-        internal
-    {
-        self.db.setEmployeeSalary(employeeId, yearlyUSDSalary);
-    }
-
-    /// @dev Remove employee
-    /// @param self Payroll Payroll data struct
-    /// @param employeeId uint256 given id to remove
-    function removeEmployee(Payroll storage self, uint256 employeeId)
-        internal
-    {
-        self.db.removeEmployee(employeeId);
-    }
-
-    /// @dev Set employee allowed tokens allocation
-    /// @param self Payroll Payroll data struct
-    /// @param tokens address[] allowed tokens
-    /// @param distribution uint256[] tokens allocation
-    function determineAllocation(
-        Payroll storage self,
-        address[] tokens,
-        uint256[] distribution
-    )
-        internal
-    {
-        self.db.setEmployeeTokenAllocation(tokens, distribution);
+        self.hatch = _hatch;
     }
 
     /// @dev Pause escape hatch contract
-    /// @param self payroll Payroll data struct
-    function escapeHatch(Payroll storage self)
+    /// @param self Payment Payment data struct
+    function escapeHatch(Payment storage self)
         internal
     {
-        EscapeHatch(self.hatch).pauseFromPayroll();
+        EscapeHatch(self.hatch).pausePayment();
     }
 
     /// @dev Pay salary to employee
     /// @notice We assume all employees take their salaries every months. Also
     /// employee can only call this function once per month.
-    /// @param self Payroll Payroll data struct
-    function payday(Payroll storage self)
+    /// @param self Payment Payment data struct
+    /// @param employeeId uint256 employee id
+    /// @param account address employee account
+    /// @param monthlyUSDSalary uint256 monthly USD salary
+    function payday(
+        Payment storage self,
+        uint256 employeeId,
+        address account,
+        uint256 monthlyUSDSalary
+    )
         internal
     {
         uint ONE_MONTH = 4 weeks;
@@ -270,7 +234,7 @@ library PayrollLibrary {
 
         if (now > nextPayDay) {
             // start next pay round
-            uint256 usdMonthlySalaries = self.db.getUSDMonthlySalaries();
+            uint256 usdMonthlySalaries = calculatePayrollBurnrate(self);
             payRound = payRound.add(1);
             self.unpaidUSDSalaries[payRound] = unpaidUSDSalaries.add(
                 usdMonthlySalaries
@@ -284,28 +248,34 @@ library PayrollLibrary {
             self.nextPayDay = nextPayDay.add(ONE_MONTH);
         }
 
-        if (self.payStats[payRound][msg.sender]) {
+        if (self.payStats[payRound][account]) {
             revert();
         }
-        self.payStats[payRound][msg.sender] = true;
+        self.payStats[payRound][account] = true;
 
-        pay(self, self.db.getEmployeeId(msg.sender));
+        pay(
+            self,
+            employeeId,
+            account,
+            monthlyUSDSalary
+        );
     }
 
     /// @dev Withdraw all token and eth
-    /// @param self Payroll Payroll data struct
-    function emergencyWithdraw(Payroll storage self)
+    /// @param self Payment Payment data struct
+    /// @param to address where we send ETH and tokens
+    function emergencyWithdraw(Payment storage self, address to)
         internal
     {
         address[] memory tokens = new address[](2);
         tokens[0] = self.antToken;
         tokens[1] = self.usdToken;
-        SharedLibrary.withdrawFrom(this, tokens);
+        SharedLibrary.withdrawFrom(this, to, tokens);
     }
 
     /// @dev Use oraclize oracle to fetch latest token exchange rates
-    /// @param self Payroll Payroll data struct
-    function updateExchangeRates(Payroll storage self)
+    /// @param self Payment Payment data struct
+    function updateExchangeRates(Payment storage self)
         internal
     {
         uint delay = 10;
@@ -321,18 +291,20 @@ library PayrollLibrary {
 
     /// @dev Callback function used by oraclize to actually set token exchange
     /// rate.
-    /// @param self Payroll Payroll data struct
+    /// @param self Payment Payment data struct
+    /// @param from address where this data comes from
     /// @param id bytes32 oraclize generated id per querying
     /// @param result string oraclize querying result, toke exchange rate
     function setExchangeRateByOraclize(
-        Payroll storage self,
+        Payment storage self,
+        address from,
         bytes32 id,
         string result
     )
         internal
     {
+        require(from == oraclizeLib.oraclize_cbAddress());
         require(self.isOracleId[id] > 0 && self.isOracleId[id] < 3);
-        require(msg.sender == oraclizeLib.oraclize_cbAddress());
 
         uint256 rate = oraclizeLib.parseInt(result, 2);
         if (self.isOracleId[id] == 1) {
@@ -343,11 +315,11 @@ library PayrollLibrary {
     }
 
     /// @dev Set token exchange rate
-    /// @param self Payroll Payroll data struct
+    /// @param self Payment Payment data struct
     /// @param token address target token
     /// @param usdExchangeRate uint256 exchange rate
     function setExchangeRate(
-        Payroll storage self,
+        Payment storage self,
         address token,
         uint256 usdExchangeRate
     )
@@ -359,14 +331,20 @@ library PayrollLibrary {
     }
 
     /// @dev Pay to employee
-    /// @param self Payroll Payroll data struct
-    /// @param employeeId uint256 specified employee to pay
-    function pay(Payroll storage self, uint256 employeeId)
+    /// @param self Payment Payment data struct
+    /// @param employeeId uint256 employee id
+    /// @param account address employee account
+    /// @param monthlyUSDSalary uint256 monthly USD salary
+    function pay(
+        Payment storage self,
+        uint256 employeeId,
+        address account,
+        uint256 monthlyUSDSalary
+    )
         private
     {
-        var (,account,monthlyUSDSalary,) = self.db.getEmployee(employeeId);
-        var tokens = self.db.getEmployeeTokens(employeeId);
-        var tokensAllocation = self.db.getEmployeeTokensAlloc(employeeId);
+        var tokens = getEmployeeTokens(self, employeeId);
+        var tokensAllocation = getEmployeeTokensAlloc(self, employeeId);
         uint256 payRound = self.payRound;
 
         self.unpaidUSDSalaries[payRound] = self.unpaidUSDSalaries[payRound].sub(
@@ -399,14 +377,14 @@ library PayrollLibrary {
     }
 
     /// @dev Pay to employee
-    /// @param self Payroll Payroll data struct
+    /// @param self Payment Payment data struct
     /// @param account address employee account address
     /// @param monthlyUSDSalary uint256 monthly usd salary
     /// @param tokens address[] allowed tokens
     /// @param allocation uint256[] tokens allocation
     /// @return uint256 left unpaid usd salary
     function payInToken(
-        Payroll storage self,
+        Payment storage self,
         address account,
         uint256 monthlyUSDSalary,
         address[] tokens,

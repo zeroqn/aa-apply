@@ -1,16 +1,17 @@
 pragma solidity ^0.4.17;
 
 /**
- * @title EmployeeLibrary
+ * @title EmployeeServLibrary
  * @dev This library implement most of logic for Employee contract
  */
 
 import "./PayrollDB.sol";
+import "./HashLibrary.sol";
 
 import "zeppelin-solidity/contracts/math/SafeMath.sol";
 
 
-library EmployeeLibrary {
+library EmployeeServLibrary {
 
     using SafeMath for uint256;
 
@@ -30,21 +31,23 @@ library EmployeeLibrary {
         uint256 alloc
     );
 
-    /// @dev Check if msg.sender is active employee
+    /// @dev Check if given address has account and is active employee
     /// @param _db address Deployed PayrollDB address
-    /// @return bool true if msg.sender is active employee
-    function isEmployee(address _db)
+    /// @return bool true if given address has corresponding active account
+    function isEmployee(address _db, address account)
         internal view returns (bool)
     {
         PayrollDB db = PayrollDB(_db);
 
-        uint256 employeeId = db.getUIntValue(keyHash("/id", msg.sender));
+        uint256 employeeId = db.getUIntValue(
+            HashLibrary.hash("/id", account)
+        );
         if (employeeId == 0) {
             return false;
         }
 
         // isn't active
-        if (!db.getBooleanValue(keyHash("/active", employeeId))) {
+        if (!db.getBooleanValue(HashLibrary.hash("/active", employeeId))) {
             return false;
         }
 
@@ -57,7 +60,7 @@ library EmployeeLibrary {
     function getEmployeeCount(address db)
         internal view returns (uint256)
     {
-        return PayrollDB(db).getUIntValue(keyHash("/count"));
+        return PayrollDB(db).getUIntValue(HashLibrary.hash("/count"));
     }
 
     /// @dev Get employeeId for given address
@@ -67,7 +70,7 @@ library EmployeeLibrary {
     function getEmployeeId(address db, address account)
         internal view returns (uint256)
     {
-        return PayrollDB(db).getUIntValue(keyHash("/id", account));
+        return PayrollDB(db).getUIntValue(HashLibrary.hash("/id", account));
     }
 
     /// @dev Get employee info for given id
@@ -85,82 +88,16 @@ library EmployeeLibrary {
     {
         PayrollDB db = PayrollDB(_db);
 
-        active = db.getBooleanValue(keyHash("/active", employeeId));
-        account = db.getAddressValue(keyHash("/account", employeeId));
+        active = db.getBooleanValue(HashLibrary.hash("/active", employeeId));
+        account = db.getAddressValue(HashLibrary.hash("/account", employeeId));
         monthlyUSDSalary = db.getUIntValue(
-            keyHash("/monthlyUSDSalary", employeeId)
+            HashLibrary.hash("/monthlyUSDSalary", employeeId)
         );
         yearlyUSDSalary = db.getUIntValue(
-            keyHash("/yearlyUSDSalary", employeeId)
+            HashLibrary.hash("/yearlyUSDSalary", employeeId)
         );
 
         return (active, account, monthlyUSDSalary, yearlyUSDSalary);
-    }
-
-    /// @dev Get total monthly USD salaries for all active employees
-    /// @param db address Deployed PayrollDB address
-    /// @return uint256 total monthly USD salaries
-    function getUSDMonthlySalaries(address db)
-        internal view returns (uint256)
-    {
-        return PayrollDB(db).getUIntValue(keyHash("/USDMonthlySalaries"));
-    }
-
-    /// @dev Get all allowed tokens for givem employeId
-    /// @param _db address Deployed PayrollDB address
-    /// @param employeeId uint256 given id to query
-    /// @return address[] allowed tokens
-    function getEmployeeTokens(address _db, uint256 employeeId)
-        internal view returns (address[] tokens)
-    {
-        PayrollDB db = PayrollDB(_db);
-        uint256 count = db.getUIntValue(keyHash("/tokens/count", employeeId));
-        uint256 nonce = db.getUIntValue(keyHash("/tokens/nonce", employeeId));
-        tokens = new address[](count);
-
-        for (uint i = 0; i < tokens.length; i++) {
-            tokens[i] = db.getAddressValue(
-                keyHash(
-                    "/tokens",
-                    employeeId,
-                    nonce,
-                    i
-                )
-            );
-        }
-
-        return tokens;
-    }
-
-    /// @dev Get tokens allocation for given employeeId
-    /// @param _db address Deployed PayrollDB address
-    /// @param employeeId uint256 given id to query
-    /// @return uint256[] tokens allocation
-    function getEmployeeTokensAlloc(
-        address _db,
-        uint256 employeeId
-    )
-        internal view returns (uint256[] allocation)
-    {
-        PayrollDB db = PayrollDB(_db);
-        uint256 nonce = db.getUIntValue(
-            keyHash("/tokens/alloc/nonce", employeeId)
-        );
-        var tokens = getEmployeeTokens(_db, employeeId);
-        allocation = new uint256[](tokens.length);
-
-        for (uint i = 0; i < tokens.length; i++) {
-            allocation[i] = db.getUIntValue(
-                keyHash(
-                    "/tokens/alloc",
-                    employeeId,
-                    nonce,
-                    tokens[i]
-                )
-            );
-        }
-
-        return allocation;
     }
 
     /// @dev Add new employee
@@ -168,13 +105,14 @@ library EmployeeLibrary {
     /// @param account address employee address
     /// @param allowedTokens address[] allowed tokens for salary payment
     /// @param initialYearlyUSDSalary uint256 salary in USD for year
+    /// @return uint256 employee id
     function addEmployee(
         address   _db,
         address   account,
         address[] allowedTokens,
         uint256   initialYearlyUSDSalary
     )
-        internal
+        internal returns (uint256)
     {
         require(account != 0x0);
         require(initialYearlyUSDSalary > 0);
@@ -186,14 +124,18 @@ library EmployeeLibrary {
 
 
         uint256 id = nextId(db);
-        db.addUIntValue(keyHash("/count"), 1);
-        db.setBooleanValue(keyHash("/active", id), true);
-        db.setAddressValue(keyHash("/account", id), account);
+        db.addUIntValue(HashLibrary.hash("/count"), 1);
+        db.setBooleanValue(HashLibrary.hash("/active", id), true);
+        db.setAddressValue(HashLibrary.hash("/account", id), account);
         setAllowedTokens(db, id, allowedTokens);
-        db.setUIntValue(keyHash("/yearlyUSDSalary", id),initialYearlyUSDSalary);
+        db.setUIntValue(
+            HashLibrary.hash("/yearlyUSDSalary", id), initialYearlyUSDSalary
+        );
         updateUSDMonthlySalaries(db, id, initialYearlyUSDSalary);
-        db.setUIntValue(keyHash("/id", account), id);
+        db.setUIntValue(HashLibrary.hash("/id", account), id);
         OnEmployeeAdded(id, account, initialYearlyUSDSalary);
+
+        return id;
     }
 
     /// @dev Set employee yearly salary
@@ -212,7 +154,7 @@ library EmployeeLibrary {
 
         updateUSDMonthlySalaries(db, employeeId, yearlyUSDSalary);
         PayrollDB(db).setUIntValue(
-            keyHash("/yearlyUSDSalary", employeeId), yearlyUSDSalary
+            HashLibrary.hash("/yearlyUSDSalary", employeeId), yearlyUSDSalary
         );
         OnEmployeeSalaryUpdated(employeeId, yearlyUSDSalary);
     }
@@ -226,8 +168,8 @@ library EmployeeLibrary {
         require(employeeId > 0);
         PayrollDB db = PayrollDB(_db);
 
-        db.setBooleanValue(keyHash("/active", employeeId), false);
-        db.subUIntValue(keyHash("/count"), 1);
+        db.setBooleanValue(HashLibrary.hash("/active", employeeId), false);
+        db.subUIntValue(HashLibrary.hash("/count"), 1);
         OnEmployeeRemoved(employeeId);
     }
 
@@ -237,6 +179,7 @@ library EmployeeLibrary {
     /// @param distribution uint256[] tokens allocation
     function setEmployeeTokenAllocation(
         address   _db,
+        address   account,
         address[] tokens,
         uint256[] distribution
     )
@@ -246,10 +189,14 @@ library EmployeeLibrary {
 
         PayrollDB db = PayrollDB(_db);
         uint256 distSum = 0;
-        uint256 employeeId = db.getUIntValue(keyHash("/id", msg.sender));
-        uint256 nonce = db.getUIntValue(keyHash("/tokens/nonce", employeeId));
+        uint256 employeeId = db.getUIntValue(
+            HashLibrary.hash("/id", account)
+        );
+        uint256 nonce = db.getUIntValue(
+            HashLibrary.hash("/tokens/nonce", employeeId)
+        );
         uint256 nextAllocTime = db.getUIntValue(
-            keyHash("/tokens/nextAllocTime", employeeId)
+            HashLibrary.hash("/tokens/nextAllocTime", employeeId)
         );
 
         require(now > nextAllocTime);
@@ -258,7 +205,7 @@ library EmployeeLibrary {
             // token should be listed
             require(
                 db.getBooleanValue(
-                    keyHash(
+                    HashLibrary.hash(
                         "/tokens",
                         employeeId,
                         nonce,
@@ -279,7 +226,8 @@ library EmployeeLibrary {
         }
         nextAllocTime = nextAllocTime.add(SIX_MONTHS);
         db.setUIntValue(
-            keyHash("/tokens/nextAllocTime", employeeId), nextAllocTime
+            HashLibrary.hash("/tokens/nextAllocTime", employeeId),
+            nextAllocTime
         );
 
         setTokensAllocation(
@@ -290,62 +238,10 @@ library EmployeeLibrary {
         );
     }
 
-    function keyHash(string property)
-        private pure returns (bytes32)
-    {
-        return keccak256("/Employee", property);
-    }
-
-    function keyHash(string property, uint id)
-        private pure returns (bytes32)
-    {
-        return keccak256("/Employee", id, property);
-    }
-
-    function keyHash(string property, address account)
-        private pure returns (bytes32)
-    {
-        return keccak256("/Employee", account, property);
-    }
-
-    function keyHash(
-        string property,
-        uint256 id,
-        uint256 nonce,
-        uint idx
-    )
-        private pure returns (bytes32)
-    {
-        return keccak256(
-            "/Employee",
-            id,
-            property,
-            nonce,
-            idx
-        );
-    }
-
-    function keyHash(
-        string property,
-        uint256 id,
-        uint256 nonce,
-        address addr
-    )
-        private pure returns (bytes32)
-    {
-        return keccak256(
-            "/Employee",
-            id,
-            property,
-            nonce,
-            addr
-        );
-    }
-
     function nextId(address db)
         private returns (uint256)
     {
-        return PayrollDB(db).addUIntValue(keyHash("/idCount"), 1);
+        return PayrollDB(db).addUIntValue(HashLibrary.hash("/idCount"), 1);
     }
 
     function setAllowedTokens(
@@ -358,13 +254,15 @@ library EmployeeLibrary {
         PayrollDB db = PayrollDB(_db);
         // also update nonce
         uint256 nonce = db.addUIntValue(
-            keyHash("/tokens/nonce", employeeId), 1
+            HashLibrary.hash("/tokens/nonce", employeeId), 1
         );
 
-        db.setUIntValue(keyHash("/tokens/count", employeeId), tokens.length);
+        db.setUIntValue(
+            HashLibrary.hash("/tokens/count", employeeId), tokens.length
+        );
         for (uint i = 0; i < tokens.length; i++) {
             db.setAddressValue(
-                keyHash(
+                HashLibrary.hash(
                     "/tokens",
                     employeeId,
                     nonce,
@@ -373,7 +271,7 @@ library EmployeeLibrary {
                 tokens[i]
             );
             db.setBooleanValue(
-                keyHash(
+                HashLibrary.hash(
                     "/tokens",
                     employeeId,
                     nonce,
@@ -396,11 +294,11 @@ library EmployeeLibrary {
 
         // also update nonce
         uint256 nonce = db.addUIntValue(
-            keyHash("/tokens/alloc/nonce", employeeId), 1
+            HashLibrary.hash("/tokens/alloc/nonce", employeeId), 1
         );
         for (uint i = 0; i < tokens.length; i++) {
             db.setUIntValue(
-                keyHash(
+                HashLibrary.hash(
                     "/tokens/alloc",
                     employeeId,
                     nonce,
@@ -424,23 +322,25 @@ library EmployeeLibrary {
         PayrollDB db = PayrollDB(_db);
 
         uint256 usdMonthlySalaries = db.getUIntValue(
-            keyHash("/USDMonthlySalaries")
+            HashLibrary.hash("/USDMonthlySalaries")
         );
         uint256 monthlyUSDSalary = yearlyUSDSalary.div(12);
 
         // for exist employee, subtract previous monthly salary
         // then add updated one.
         uint256 preMonthlySalary = db.getUIntValue(
-            keyHash("/monthlyUSDSalary", employeeId)
+            HashLibrary.hash("/monthlyUSDSalary", employeeId)
         );
         if (preMonthlySalary != 0) {
             usdMonthlySalaries = usdMonthlySalaries.sub(preMonthlySalary);
         }
 
         usdMonthlySalaries = usdMonthlySalaries.add(monthlyUSDSalary);
-        db.setUIntValue(keyHash("/USDMonthlySalaries"), usdMonthlySalaries);
         db.setUIntValue(
-            keyHash("/monthlyUSDSalary", employeeId), monthlyUSDSalary
+            HashLibrary.hash("/USDMonthlySalaries"), usdMonthlySalaries
+        );
+        db.setUIntValue(
+            HashLibrary.hash("/monthlyUSDSalary", employeeId), monthlyUSDSalary
         );
     }
 

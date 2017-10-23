@@ -4,7 +4,7 @@ pragma solidity ^0.4.17;
  * @title EscapeHatch
  * @dev Monthly salaries will be sent to this contract firstly, then wait
  * for one day before employees can actually withdraw their salaires. Owner
- * can pause this contract either directly or through Payroll contract at
+ * can pause this contract either directly or through Payment contract at
  * anytime, then owner can withdraw salaries from this contract.
  */
 
@@ -19,7 +19,7 @@ contract EscapeHatch is Pausable {
 
     using SafeMath for uint;
 
-    address public payroll;
+    address public payment;
     address[] public tokens;
 
     mapping (address => uint256) public ethBalances;
@@ -29,8 +29,8 @@ contract EscapeHatch is Pausable {
     mapping (address => bool) isTokenListed;
     mapping (address => uint256) public endQuaratineDates;
 
-    modifier onlyPayrollOrOwner() {
-        require(msg.sender == owner || msg.sender == payroll);
+    modifier onlyPaymentOrOwner() {
+        require(msg.sender == owner || msg.sender == payment);
         _;
     }
 
@@ -54,18 +54,17 @@ contract EscapeHatch is Pausable {
         // constructor
     }
 
-    function setPayroll(address _payroll)
+    function setPayment(address _payment)
         onlyOwner
         external
     {
-        require(_payroll != 0x0);
+        require(_payment != 0x0);
 
-        payroll = _payroll;
+        payment = _payment;
     }
 
-    function pauseFromPayroll()
-        onlyPayrollOrOwner
-        whenNotPaused
+    function pausePayment()
+        onlyPaymentOrOwner
         external
     {
         paused = true;
@@ -82,7 +81,7 @@ contract EscapeHatch is Pausable {
         uint256[] _amounts
     )
         whenNotPaused
-        onlyPayrollOrOwner
+        onlyPaymentOrOwner
         payable
         external
     {
@@ -137,7 +136,7 @@ contract EscapeHatch is Pausable {
         whenPaused
         external
     {
-        SharedLibrary.withdrawFrom(this, tokens);
+        SharedLibrary.withdrawFrom(this, msg.sender, tokens);
         OnEmergencyWithdraw();
     }
 
