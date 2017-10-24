@@ -31,7 +31,7 @@ contract Payroll is Pausable {
         uint256 indexed employeeId,
         uint256 indexed yearlyUSDSalary
     );
-    event OnEmployeeRemoved(uint256 indexed employeeId);
+    event OnEmployeeRemoved(uint256 indexed employeeId, uint256 date);
     event OnAllocationChanged(
         uint256 indexed employeeId,
         address token,
@@ -135,7 +135,7 @@ contract Payroll is Pausable {
     {
         EmployeeServ(employeeServ).removeEmployee(employeeId);
 
-        OnEmployeeRemoved(employeeId);
+        OnEmployeeRemoved(employeeId, now);
     }
 
     function addFunds()
