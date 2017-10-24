@@ -53,7 +53,8 @@ contract('Payroll', (accounts) => {
 
     await payroll.addEmployee(testEmployee, allowedTokens,
       testYearlyUSDSalary, {from: owner});
-    testEmployeeId = await payroll.getEmployeeId(testEmployee);
+    testEmployeeId = (await payroll.getEmployeeId.call(testEmployee))
+      .toNumber();
   });
 
   it('should add new employee', async () => {
@@ -122,7 +123,7 @@ contract('Payroll', (accounts) => {
 
     await payroll.removeEmployee(testEmployeeId, {from: owner});
     events = await helper.getEvents(payroll.OnEmployeeRemoved());
-    let [active, ...rest] = await payroll.getEmployee(testEmployeeId);
+    let [active, ...rest] = await payroll.getEmployee.call(testEmployeeId);
 
     assert.equal(events.length, 1);
     assert.equal(events[0].args.employeeId.toNumber(), testEmployeeId);
@@ -138,21 +139,21 @@ contract('Payroll', (accounts) => {
   it('should return employee count', async () => {
     let count;
 
-    count = await payroll.getEmployeeCount();
+    count = await payroll.getEmployeeCount.call();
     assert.equal(count.toNumber(), 1);
 
     await payroll.addEmployee(accounts[1], allowedTokens,
       testYearlyUSDSalary, {from: owner});
-    count = await payroll.getEmployeeCount();
+    count = await payroll.getEmployeeCount.call();
     assert.equal(count.toNumber(), 2);
 
     await payroll.removeEmployee(testEmployeeId, {from: owner});
-    count = await payroll.getEmployeeCount();
+    count = await payroll.getEmployeeCount.call();
     assert.equal(count.toNumber(), 1);
   });
 
   it('should return employee info', async () => {
-    let [active, account, yearlyUSDSalary] = await payroll.getEmployee(
+    let [active, account, yearlyUSDSalary] = await payroll.getEmployee.call(
       testEmployeeId);
 
     assert.isTrue(active);
@@ -188,7 +189,7 @@ contract('Payroll', (accounts) => {
   });
 
   it('should return monthly salaries burnrate', async () => {
-    let burnrate = await payroll.calculatePayrollBurnrate();
+    let burnrate = await payroll.calculatePayrollBurnrate.call();
 
     assert.equal(burnrate.toNumber(), testYearlyUSDSalary / 12);
   });
@@ -249,7 +250,7 @@ contract('Payroll', (accounts) => {
       monthlyUSDSalary;
     let leftMonths;
 
-    leftMonths = await payroll.calculatePayrollRunwayInMonths();
+    leftMonths = await payroll.calculatePayrollRunwayInMonths.call();
     assert.equal(leftMonths.toNumber(), months);
   });
 
