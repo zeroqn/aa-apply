@@ -33,7 +33,7 @@ async function deploy(deployer) {
   await serv.setPayrollAddress(Payroll.address);
 
   db = await PayrollDB.deployed();
-  await db.setAllowedContract([Payroll.address]);
+  await db.setAllowedContract([EmployeeServ.address, PaymentServ.address]);
 
   hatch = await EscapeHatch.deployed();
   await hatch.setPayment(PaymentServ.address);
